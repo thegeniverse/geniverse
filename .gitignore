@@ -7,7 +7,7 @@ __pycache__
 
 # PyPI
 dist
-hugging_gan_test.egg-info
+geniverse.egg-info
 build
 experiments
 
