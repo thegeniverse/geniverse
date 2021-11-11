@@ -13,8 +13,8 @@ from PIL import Image
 from transformers import BartTokenizer  #, CLIPProcessor, FlaxCLIPModel
 
 from geniverse.modeling_utils import ImageGenerator
-from dalle_mini.model import CustomFlaxBartForConditionalGeneration
-from vqgan_jax.modeling_flax_vqgan import VQModel
+from forks.dalle_mini import CustomFlaxBartForConditionalGeneration
+from forks.vqgan_jax import VQModel
 
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
