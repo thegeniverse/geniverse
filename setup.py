@@ -22,7 +22,7 @@ setuptools.setup(
     ],
     # package_dir={
     #     "": ".",
-    #     "taming": "./bigotis/models/taming/modeling_taming",
+    #     "taming": "./geniverse/models/taming/modeling_taming",
     # },
     packages=setuptools.find_packages(),
     python_requires=">=3.6",

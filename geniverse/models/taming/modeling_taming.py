@@ -13,7 +13,7 @@ import PIL
 from PIL import Image
 from omegaconf import OmegaConf
 from forks.taming_transformers.taming.models.vqgan import VQModel, GumbelVQ
-from bigotis.modeling_utils import ImageGenerator
+from geniverse.modeling_utils import ImageGenerator
 
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 

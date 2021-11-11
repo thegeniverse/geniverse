@@ -10,6 +10,6 @@ The `DALL-E Mini`...
 DALL-E Mini
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: bigotis.models.DalleMini
+.. autoclass:: geniverse.models.DalleMini
     :members: 
 

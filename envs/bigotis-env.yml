@@ -1,4 +1,4 @@
-name: bigotis
+name: geniverse
 channels:
   - conda-forge
   - anaconda
@@ -13,4 +13,4 @@ dependencies:
   - sphinx=3.2.1
   - pip=21.0.1
   - pip:
-    - -r bigotis-requirements.txt
+    - -r geniverse-requirements.txt

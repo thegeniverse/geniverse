@@ -12,7 +12,7 @@ import PIL
 from PIL import Image
 from transformers import BartTokenizer  #, CLIPProcessor, FlaxCLIPModel
 
-from bigotis.modeling_utils import ImageGenerator
+from geniverse.modeling_utils import ImageGenerator
 from dalle_mini.model import CustomFlaxBartForConditionalGeneration
 from vqgan_jax.modeling_flax_vqgan import VQModel
 

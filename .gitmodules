@@ -1,0 +1,11 @@
+[submodule "forks/taming_transformers"]
+	path = forks/taming_transformers
+	url = https://github.com/vipermu/taming-transformers
+[submodule "forks/dalle_mini"]
+	path = forks/dalle_mini
+	url = https://github.com/vipermu/dalle-mini
+[submodule "forks/vqgan_jax"]
+	path = forks/vqgan_jax
+	url = https://github.com/vipermu/vqgan-jax
+
+

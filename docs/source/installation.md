@@ -11,6 +11,6 @@ pip install hugging-gan-test
 
 Make sure it is working by running the following
 ```bash
-python -c "import bigotis; print("WORKING!"))"
+python -c "import geniverse; print("WORKING!"))"
 ```
 

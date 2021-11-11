@@ -10,6 +10,6 @@ The `Taming Decoder` decoder...
 TamingDecoder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: bigotis.models.TamingDecoder
+.. autoclass:: geniverse.models.TamingDecoder
     :members: 
 

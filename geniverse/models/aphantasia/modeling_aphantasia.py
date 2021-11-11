@@ -8,7 +8,7 @@ import torchvision
 import PIL
 from PIL import Image
 import numpy as np
-from bigotis.modeling_utils import ImageGenerator
+from geniverse.modeling_utils import ImageGenerator
 
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 

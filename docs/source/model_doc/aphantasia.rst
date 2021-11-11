@@ -10,5 +10,5 @@ The `Aphantasia`...
 Aphantasia
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: bigotis.models.Aphantasia
+.. autoclass:: geniverse.models.Aphantasia
     :members: 
