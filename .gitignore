@@ -1,0 +1,19 @@
+# LOCAL CONFIG FILES
+.vscode/settings.json
+
+# CACHES
+.modeling_cache
+__pycache__
+
+# PyPI
+dist
+hugging_gan_test.egg-info
+build
+experiments
+
+# DOCS
+docs/build
+
+# IMAGES
+*.png
+*.jpg
