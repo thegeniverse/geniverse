@@ -13,4 +13,4 @@ flax==0.3.4
 # git+https://github.com/patil-suraj/vqgan-jax.git
 
 jax 
-jaxlib==0.1.69+cuda110 -f https://storage.googleapis.com/jax-releases/jax_releases.html
+# jaxlib==0.1.69+cuda110 -f https://storage.googleapis.com/jax-releases/jax_releases.html
