@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="geniverse",
-    version="0.0.1",
+    version="0.0.3",
     author="Javi and Vicc",
     author_email="vipermu97@gmail.com",
     description="Easy library for guiding generative AI models. Find your latent!",
