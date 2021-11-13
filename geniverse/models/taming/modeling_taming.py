@@ -503,13 +503,13 @@ class TamingDecoder(ImageGenerator):
 if __name__ == '__main__':
     target_img_height = 256
     target_img_width = 256
-    prompt = "A pink dog"
+    prompt = "A dog"
     lr = 0.1
-    num_steps = 200
-    num_augmentations = 128
+    num_steps = 1
+    num_augmentations = 32
     loss_type = 'cosine_similarity'
     init_img_path = None
-    # init_img_path = "tree.jpg"
+    init_img_path = "medusa.jpg"
     loss_clip_value = None
 
     taming_decoder = TamingDecoder()
