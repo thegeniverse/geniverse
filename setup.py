@@ -5,15 +5,15 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="geniverse",
-    version="0.0.3",
+    version="0.0.6",
     author="Javi and Vicc",
     author_email="vipermu97@gmail.com",
     description="Easy library for guiding generative AI models. Find your latent!",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/geniverse/Geniverse",
+    url="https://github.com/thegeniverse/geniverse",
     project_urls={
-        "Docs": "https://github.com/javismiles/HuggingGAN/docs",
+        "Docs": "https://github.com/thegeniverse/geniverse/docs",
     },
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -25,10 +25,11 @@ setuptools.setup(
     #     "taming": "./geniverse/models/taming/modeling_taming",
     # },
     packages=setuptools.find_packages(),
+    # packages=["geniverse", "forks"],
     python_requires=">=3.6",
     install_requires=[
         "tqdm==4.60.0",
-        "clip_by_openai",
+        "clip_by_openai==0.1.1.5",
         "dall-e==0.1",
         "imageio-ffmpeg==0.4.3",
         "PyYAML==5.4.1",
@@ -40,9 +41,8 @@ setuptools.setup(
         "torchvision==0.8.2",
         "tensorboard>=2.2.0",
         "transformers>=4.10.0",
-        "flax>=0.3.4",
-        "jax",
-        "kornia",
+        # "flax>=0.3.4",
+        # "jax==0.2.20",
         # "jaxlib==0.1.69+cuda110 -f https://storage.googleapis.com/jax-releases/jax_releases.html",
     ],
 )
