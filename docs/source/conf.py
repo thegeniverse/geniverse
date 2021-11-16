@@ -19,12 +19,12 @@ sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 
-project = 'hugging-gan'
+project = 'geniverse'
 copyright = '2021, javi and vicc'
 author = 'javi and vicc'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = '0.0.3'
 
 # Prefix link to point to master, comment this during version release and uncomment below line
 # extlinks = {
