@@ -8,7 +8,6 @@ import PIL
 import numpy as np
 from PIL import Image
 
-import matplotlib.pyplot as plt
 
 
 class ImageGenerator(
@@ -340,194 +339,196 @@ class ImageGenerator(
             '`generate_from_prompt` method must be defined by the user.')
 
 
-if __name__ == "__main__":
-    prompt = "The image of a rainy landscape"
+# import matplotlib.pyplot as plt
 
-    anti_prompt = "The image of a sunny landscape"
-    co_prompt = "The image of a cloudy landscape"
+# if __name__ == "__main__":
+#     prompt = "The image of a rainy landscape"
 
-    anti_img_path = "./sunny.jpg"
-    co_img_path = "./rainy.jpg"
+#     anti_prompt = "The image of a sunny landscape"
+#     co_prompt = "The image of a cloudy landscape"
 
-    image_generator = ImageGenerator()
+#     anti_img_path = "./sunny.jpg"
+#     co_img_path = "./rainy.jpg"
 
-    prompt_embed = image_generator.get_clip_text_encodings(prompt)
-    anti_prompt_embed = image_generator.get_clip_text_encodings(anti_prompt)
-    co_prompt_embed = image_generator.get_clip_text_encodings(co_prompt)
+#     image_generator = ImageGenerator()
 
-    anti_img = image_generator.load_img(anti_img_path)
-    anti_img_embed = image_generator.get_clip_img_encodings(anti_img)
+#     prompt_embed = image_generator.get_clip_text_encodings(prompt)
+#     anti_prompt_embed = image_generator.get_clip_text_encodings(anti_prompt)
+#     co_prompt_embed = image_generator.get_clip_text_encodings(co_prompt)
 
-    co_img = image_generator.load_img(co_img_path)
-    co_img_embed = image_generator.get_clip_img_encodings(co_img)
+#     anti_img = image_generator.load_img(anti_img_path)
+#     anti_img_embed = image_generator.get_clip_img_encodings(anti_img)
 
-    prompt_embed = prompt_embed.clip(-.1, .1)
-    anti_prompt_embed = anti_prompt_embed.clip(-.1, .1)
-    co_prompt_embed = co_prompt_embed.clip(-.1, .1)
-    anti_img_embed = anti_img_embed.clip(-.1, .1)
-    co_img_embed = co_img_embed.clip(-.1, .1)
+#     co_img = image_generator.load_img(co_img_path)
+#     co_img_embed = image_generator.get_clip_img_encodings(co_img)
 
-    # XXX: SINGLE HIST
-    bins = np.linspace(-.5, .5, 256)
+#     prompt_embed = prompt_embed.clip(-.1, .1)
+#     anti_prompt_embed = anti_prompt_embed.clip(-.1, .1)
+#     co_prompt_embed = co_prompt_embed.clip(-.1, .1)
+#     anti_img_embed = anti_img_embed.clip(-.1, .1)
+#     co_img_embed = co_img_embed.clip(-.1, .1)
 
-    plt.figure(figsize=(16, 12))
+#     # XXX: SINGLE HIST
+#     bins = np.linspace(-.5, .5, 256)
 
-    plt.hist(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        bins,
-        alpha=0.5,
-        label='PROMPT',
-    )
-    plt.hist(
-        anti_prompt_embed.detach().cpu().numpy().flatten(),
-        bins,
-        alpha=0.5,
-        label='ANTI PROMPT',
-    )
-    plt.hist(
-        co_prompt_embed.detach().cpu().numpy().flatten(),
-        bins,
-        alpha=0.5,
-        label='CO PROMPT',
-    )
-    plt.hist(
-        anti_img_embed.detach().cpu().numpy().flatten(),
-        bins,
-        alpha=0.5,
-        label='ANTI IMG',
-    )
-    plt.hist(
-        co_img_embed.detach().cpu().numpy().flatten(),
-        bins,
-        alpha=0.5,
-        label='CO IMG',
-    )
+#     plt.figure(figsize=(16, 12))
 
-    plt.legend(loc='upper right')
+#     plt.hist(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         bins,
+#         alpha=0.5,
+#         label='PROMPT',
+#     )
+#     plt.hist(
+#         anti_prompt_embed.detach().cpu().numpy().flatten(),
+#         bins,
+#         alpha=0.5,
+#         label='ANTI PROMPT',
+#     )
+#     plt.hist(
+#         co_prompt_embed.detach().cpu().numpy().flatten(),
+#         bins,
+#         alpha=0.5,
+#         label='CO PROMPT',
+#     )
+#     plt.hist(
+#         anti_img_embed.detach().cpu().numpy().flatten(),
+#         bins,
+#         alpha=0.5,
+#         label='ANTI IMG',
+#     )
+#     plt.hist(
+#         co_img_embed.detach().cpu().numpy().flatten(),
+#         bins,
+#         alpha=0.5,
+#         label='CO IMG',
+#     )
 
-    plt.savefig('hist.png', dpi=200)
+#     plt.legend(loc='upper right')
 
-    # XXX: MULTIPLE HIST
-    bins = np.linspace(-.5, .5, 256)
+#     plt.savefig('hist.png', dpi=200)
 
-    plt.figure(figsize=(16, 12))
-    plt.hist(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-        bins=bins,
-    )
-    plt.hist(
-        anti_prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='ANTI PROMPT',
-        bins=bins,
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('hist-prompt-antiprompt.png', dpi=200)
+#     # XXX: MULTIPLE HIST
+#     bins = np.linspace(-.5, .5, 256)
 
-    plt.figure(figsize=(16, 12))
-    plt.hist(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-        bins=bins,
-    )
-    plt.hist(
-        co_prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='CO PROMPT',
-        bins=bins,
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('hist-prompt-coprompt.png', dpi=200)
+#     plt.figure(figsize=(16, 12))
+#     plt.hist(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#         bins=bins,
+#     )
+#     plt.hist(
+#         anti_prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='ANTI PROMPT',
+#         bins=bins,
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('hist-prompt-antiprompt.png', dpi=200)
 
-    plt.figure(figsize=(16, 12))
-    plt.hist(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-        bins=bins,
-    )
-    plt.hist(
-        anti_img_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='ANTI IMG',
-        bins=bins,
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('hist-prompt-antiimg.png', dpi=200)
+#     plt.figure(figsize=(16, 12))
+#     plt.hist(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#         bins=bins,
+#     )
+#     plt.hist(
+#         co_prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='CO PROMPT',
+#         bins=bins,
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('hist-prompt-coprompt.png', dpi=200)
 
-    plt.figure(figsize=(16, 12))
-    plt.hist(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-        bins=bins,
-    )
-    plt.hist(
-        co_img_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='CO IMG',
-        bins=bins,
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('hist-prompt-coimg.png', dpi=200)
+#     plt.figure(figsize=(16, 12))
+#     plt.hist(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#         bins=bins,
+#     )
+#     plt.hist(
+#         anti_img_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='ANTI IMG',
+#         bins=bins,
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('hist-prompt-antiimg.png', dpi=200)
 
-    # XXX: MULTIPLE PLOTS
+#     plt.figure(figsize=(16, 12))
+#     plt.hist(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#         bins=bins,
+#     )
+#     plt.hist(
+#         co_img_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='CO IMG',
+#         bins=bins,
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('hist-prompt-coimg.png', dpi=200)
 
-    plt.figure(figsize=(16, 12))
-    plt.plot(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-    )
-    plt.plot(
-        anti_prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='ANTI PROMPT',
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('plot-prompt-antiprompt.png', dpi=200)
+#     # XXX: MULTIPLE PLOTS
 
-    plt.figure(figsize=(16, 12))
-    plt.plot(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-    )
-    plt.plot(
-        co_prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='CO PROMPT',
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('plot-prompt-coprompt.png', dpi=200)
+#     plt.figure(figsize=(16, 12))
+#     plt.plot(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#     )
+#     plt.plot(
+#         anti_prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='ANTI PROMPT',
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('plot-prompt-antiprompt.png', dpi=200)
 
-    plt.figure(figsize=(16, 12))
-    plt.plot(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-    )
-    plt.plot(
-        anti_img_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='ANTI IMG',
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('plot-prompt-antiimg.png', dpi=200)
+#     plt.figure(figsize=(16, 12))
+#     plt.plot(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#     )
+#     plt.plot(
+#         co_prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='CO PROMPT',
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('plot-prompt-coprompt.png', dpi=200)
 
-    plt.figure(figsize=(16, 12))
-    plt.plot(
-        prompt_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='PROMPT',
-    )
-    plt.plot(
-        co_img_embed.detach().cpu().numpy().flatten(),
-        alpha=0.5,
-        label='CO IMG',
-    )
-    plt.legend(loc='upper right')
-    plt.savefig('plot-prompt-coimg.png', dpi=200)
+#     plt.figure(figsize=(16, 12))
+#     plt.plot(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#     )
+#     plt.plot(
+#         anti_img_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='ANTI IMG',
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('plot-prompt-antiimg.png', dpi=200)
+
+#     plt.figure(figsize=(16, 12))
+#     plt.plot(
+#         prompt_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='PROMPT',
+#     )
+#     plt.plot(
+#         co_img_embed.detach().cpu().numpy().flatten(),
+#         alpha=0.5,
+#         label='CO IMG',
+#     )
+#     plt.legend(loc='upper right')
+#     plt.savefig('plot-prompt-coimg.png', dpi=200)
