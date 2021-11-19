@@ -503,19 +503,22 @@ class TamingDecoder(ImageGenerator):
 if __name__ == '__main__':
     target_img_height = 256
     target_img_width = 256
-    prompt = "A dog"
-    lr = 0.1
-    num_steps = 1
+    prompt = "A glowing jellyfish"
+    lr = 0.5
+    num_steps = 100
     num_augmentations = 32
     loss_type = 'cosine_similarity'
     init_img_path = None
-    init_img_path = "medusa.jpg"
+    # init_img_path = "medusa.jpg"
     loss_clip_value = None
+
+    save_latents = False
+    zoom = False
 
     taming_decoder = TamingDecoder()
 
     init_latents_path = f"./{prompt}_logits.pt"
-    if os.path.exists(init_latents_path):
+    if os.path.exists(init_latents_path) and save_latents:
         init_latents = torch.load(init_latents_path).to('cuda')
     else:
 
@@ -525,7 +528,7 @@ if __name__ == '__main__':
 
             x_rec_img = torchvision.transforms.ToPILImage(mode='RGB')(
                 rec_img[0])
-            x_rec_img.save(f"{step}.jpg")
+            x_rec_img.save(f"generations/{step}.jpg")
 
         gen_img_list, z_logits_list = taming_decoder.generate_from_prompt(
             prompt=prompt,
@@ -543,10 +546,11 @@ if __name__ == '__main__':
         init_latents = z_logits_list[-1]
         torch.save(init_latents, f'{prompt}_logits.pt')
 
-    gen_img_list, z_logits_list = taming_decoder.zoom(
-        prompt,
-        init_latents=init_latents,
-    )
+    if zoom:
+        gen_img_list, z_logits_list = taming_decoder.zoom(
+            prompt,
+            init_latents=init_latents,
+        )
 
     # _gen_img_list, z_logits_list_ = taming_decoder.generate_from_prompt(
     #     prompt="Pokemon of type grass",
