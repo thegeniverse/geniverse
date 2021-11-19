@@ -9,14 +9,12 @@ import numpy as np
 from PIL import Image
 
 
-
 class ImageGenerator(
         torch.nn.Module,
         metaclass=abc.ABCMeta,
 ):
     """
-    This class provides common functionalities among any image 
-    generator.
+    This class provides common functionalities among image generators.
     """
     def __init__(self, ):
         """
@@ -43,21 +41,21 @@ class ImageGenerator(
         )
 
         self.aug_transform = torch.nn.Sequential(
-            torchvision.transforms.RandomHorizontalFlip(p=0.7, ),
+            torchvision.transforms.RandomHorizontalFlip(p=0.4, ),
             torchvision.transforms.RandomApply(
                 torch.nn.ModuleList([
                     torchvision.transforms.RandomAffine(
-                        degrees=20,
-                        translate=(0.1, 0.1),
-                        # scale=(0.8, 1),
+                        degrees=15,
+                        translate=(0.15, 0.15),
+                        scale=(0.8, 1.2),
                         # shear=25,
-                        # padding_mode='border',
+                        #
                     ),
                 ]),
                 p=0.8,
             ),
             torchvision.transforms.RandomPerspective(
-                distortion_scale=0.2,
+                distortion_scale=0.1,
                 p=0.4,
             ),
             torchvision.transforms.RandomApply(
@@ -69,12 +67,8 @@ class ImageGenerator(
                         hue=0.01,
                     ),
                 ]),
-                p=0.8,
+                p=0.4,
             ),
-            # torchvision.transforms.RandomSharpness(
-            #     0.3,
-            #     p=0.4,
-            # ),
         ).to(self.device)
 
         self.supported_loss_types = [
@@ -87,13 +81,18 @@ class ImageGenerator(
         img_batch: torch.Tensor,
         noise_factor: float = 0.11,
     ) -> torch.Tensor:
-        # noise = torch.rand((img_batch.shape[0], 1, 1, 1)).to(self.device)
-        # noise *= torch.randn_like(img_batch, requires_grad=False)
+        """
+        Adds random noise to an image batch.
+
+        Args:
+            img_batch (torch.Tensor): image batch where the noise is added.
+            noise_factor (float, optional): controls the amount of noise to be added. Defaults to 0.11.
+
+        Returns:
+            torch.Tensor: a batch of images with noise.
+        """
         noise = noise_factor * torch.rand((img_batch.shape[0], 1, 1, 1)).to(
             self.device) * torch.randn_like(img_batch, requires_grad=False)
-
-        # batch_mask = (torch.rand((img_batch.shape[0])) <= noise_factor).to(self.device)
-        # noise *= batch_mask[:, None, None, None]
 
         img_batch = img_batch + noise
         img_batch = img_batch.clamp(0, 1)
@@ -102,10 +101,10 @@ class ImageGenerator(
 
     def augment(
         self,
-        img_batch,
+        img_batch: torch.Tensor,
         target_img_width: int = None,
         target_img_height: int = None,
-        num_crops=64,
+        num_crops: int = 64,
         noise_factor: float = 0.11,
         pad_downscale: int = 3,
     ):
@@ -117,7 +116,9 @@ class ImageGenerator(
             img_batch (torch.Tensor): batch of images to augment with shape BxHxWx3.
             target_img_width (int, optional): width of the augmented images. Defaults to img size.
             target_img_height (int, optional): height of the augmented images. Defaults to img size
-            num_crops (int, optional): Number of augmentations to generate. Defaults to 32.
+            num_crops (int, optional): number of augmentations to generate. Defaults to 32.
+            noise_factor (float, optional): controls the amount of noise that is added to each crop. Defaults to 0.11.
+            pad_downscale (int, optional): represents the fraction of the original image size used to compute the amount of padding to be used. The larger the less padding. Defaults to 3.
 
         Returns:
             torch.Tensor: augmented batch of images.
@@ -143,11 +144,16 @@ class ImageGenerator(
 
         min_img_size = min(target_img_width, target_img_height)
 
+        # img_batch = torch.nn.functional.interpolate(
+        #     img_batch,
+        #     (int(min(min_img_size, self.clip_input_img_size*1.5)), ) * 2,
+        #     mode='bilinear',
+        #     # align_corners=True,
+        # )
         aug_img_batch = self.aug_transform(img_batch)
 
         augmented_img_list = []
         for crop_idx in range(num_crops):
-
             crop_size = int(
                 torch.normal(
                     1,
@@ -171,12 +177,9 @@ class ImageGenerator(
                     crop_size),
                 (),
             )
+
             augmented_img = aug_img_batch[:, :, offsety:offsety + crop_size,
                                           offsetx:offsetx + crop_size, ]
-
-            # else:
-            #     augmented_img = aug_img_batch[:, :, x_pad_size:-x_pad_size,
-            #                                   y_pad_size:-y_pad_size]
 
             augmented_img = torch.nn.functional.interpolate(
                 augmented_img,
@@ -200,14 +203,14 @@ class ImageGenerator(
             noise_factor=noise_factor,
         )
 
-        # from PIL import Image
-        # import numpy as np
+        from PIL import Image
+        import numpy as np
 
-        # for idx in range(img_batch.shape[0]):
-        #     Image.fromarray(
-        #         np.uint8(
-        #             img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
-        #             255)).save(f'aug_{idx}.jpg')
+        for idx in range(img_batch.shape[0]):
+            Image.fromarray(
+                np.uint8(
+                    img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
+                    255)).save(f'aug_{idx}.jpg')
 
         return img_batch
 
