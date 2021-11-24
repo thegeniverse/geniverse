@@ -14,6 +14,7 @@ from PIL import Image
 from omegaconf import OmegaConf
 from forks.taming_transformers.taming.models.vqgan import VQModel, GumbelVQ
 from geniverse.modeling_utils import ImageGenerator
+from scipy.stats import norm
 
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
@@ -29,6 +30,8 @@ VQGAN_CONFIG_DICT = {
     "openimages-8192":
     r"https://raw.githubusercontent.com/vipermu/taming-transformers/master/configs/openimages-8192.yaml",
 }
+
+FPS = 25
 
 
 class TamingDecoder(ImageGenerator):
@@ -152,7 +155,7 @@ class TamingDecoder(ImageGenerator):
         z_logits: torch.Tensor,
         target_img_height: int = None,
         target_img_width: int = None,
-    ):
+    ) -> torch.Tensor:
         z = self.vqgan_model.post_quant_conv(z_logits)
         img_rec = self.vqgan_model.decoder(z)
         img_rec = (img_rec.clip(-1, 1) + 1) / 2
@@ -189,6 +192,7 @@ class TamingDecoder(ImageGenerator):
     def get_latents_from_img(
         self,
         img: Union[torch.Tensor, PIL.Image.Image],
+        num_rec_steps: int = 0,
     ):
         if torch.is_tensor(img):
             img_tensor = img
@@ -204,9 +208,49 @@ class TamingDecoder(ImageGenerator):
 
         img_tensor = img_tensor.float().to(self.device)
 
+        img_tensor = torch.nn.functional.interpolate(
+            img_tensor,
+            (int((img_tensor.shape[2] / 16) * 16),
+             int((img_tensor.shape[3] / 16) * 16)),
+            mode="bilinear",
+        )
+
         z, _, [_, _, _indices] = self.vqgan_model.encode(img_tensor)
 
         z = z.to(self.device)
+
+        rec_optimizer = None
+        for rec_idx in range(num_rec_steps):
+            if rec_idx == 0:
+                if not torch.is_tensor(img):
+                    img = img.convert('RGB')
+                    img = torch.tensor(np.asarray(img))
+                    img = img_tensor.permute(2, 0, 1)
+                    img = (img / 255.)
+
+                img = img.detach()
+                z = torch.nn.Parameter(z).detach()
+                z.requires_grad = True
+                rec_optimizer = torch.optim.AdamW(
+                    params=[z],
+                    lr=0.01,
+                    betas=(0.9, 0.999),
+                    weight_decay=0.1,
+                )
+
+                rec_loss_weight = img_tensor.shape[2] * img_tensor.shape[3]
+
+            img_rec = self.get_img_from_latents(z, )
+            rec_loss = rec_loss_weight * torch.nn.functional.mse_loss(
+                img_rec,
+                img,
+            )
+
+            logging.info(f"Rec loss {rec_loss}")
+
+            rec_optimizer.zero_grad()
+            rec_loss.backward()
+            rec_optimizer.step()
 
         return z
 
@@ -359,6 +403,8 @@ class TamingDecoder(ImageGenerator):
         self,
         latents_list: List[torch.Tensor],
         duration_list: List[float],
+        interpolation_type: str = "sinusoidal",  #sinusoidal | linear
+        loop: bool = True,
         **kwargs,
     ) -> List[PIL.Image.Image]:
         """
@@ -380,21 +426,34 @@ class TamingDecoder(ImageGenerator):
         z_logits_list = latents_list
 
         gen_img_list = []
-        fps = 25
 
         for idx, (z_logits,
                   duration) in enumerate(zip(z_logits_list, duration_list)):
-            num_steps = int(duration * fps)
+
+            if idx == len(z_logits_list) - 1 and not loop:
+                break
+
+            num_steps = int(duration * FPS)
             z_logits_1 = z_logits
             z_logits_2 = z_logits_list[(idx + 1) % len(z_logits_list)]
 
             for step in range(num_steps):
-                weight = math.sin(1.5708 * step / num_steps)**2
+                if step == num_steps - 1 and num_steps > 1:
+                    weight = 1
+
+                else:
+                    if interpolation_type == "linear":
+                        if num_steps - 1 > 0:
+                            weight = step / (num_steps - 1)
+                        else:
+                            weight = 0
+
+                    else:
+                        weight = math.sin(1.5708 * step / num_steps)**2
+
                 z_logits = weight * z_logits_2 + (1 - weight) * z_logits_1
 
-                z = self.vqgan_model.post_quant_conv(z_logits)
-                rec_img = self.vqgan_model.decoder(z)
-                rec_img = (rec_img.clip(-1, 1) + 1) / 2
+                rec_img = self.get_img_from_latents(z_logits, )
 
                 x_rec_img = torchvision.transforms.ToPILImage(mode='RGB')(
                     rec_img[0])
@@ -408,92 +467,131 @@ class TamingDecoder(ImageGenerator):
         self,
         prompt: str,
         init_latents: torch.Tensor,
-        lr: float = 0.008,
+        lr: float = 0.05,
         num_generations: int = 64,
-        num_zoom_interp_steps=2,
-        num_zoom_train_steps=8,
+        num_zoom_interp_steps=1,
+        num_zoom_train_steps=1,
         zoom_offset=4,
     ):
-        z_logits = init_latents.detach().clone()
-        z_logits = torch.nn.Parameter(z_logits)
-
-        optimizer = torch.optim.AdamW(
-            params=[z_logits],
-            lr=lr,
-            betas=(0.9, 0.999),
-            weight_decay=0.1,
-        )
-
         gen_img_list = []
         z_logits_list = []
-        for step in range(num_generations):
-            logging.info(f"Generation {step}/{num_generations}")
 
-            with torch.no_grad():
-                z = self.vqgan_model.post_quant_conv(z_logits)
-                rec_img = self.vqgan_model.decoder(z)
-                rec_img = (rec_img.clip(-1, 1) + 1) / 2
+        optim_latents = init_latents.clone()
+        optim_latents = torch.nn.Parameter(optim_latents)
 
-                x_rec_size = rec_img.shape[-1]
+        init_img = self.get_img_from_latents(init_latents, )
+        img_size = init_img.shape[2::]
+        a = norm.pdf(np.arange(-1, 1, 2 / img_size[0]), 0, 0.2)
+        b = a / a.max()
+        mask = b[:, None] @ b[None, :]
 
-                x_rec_zoom = rec_img[:, :, zoom_offset:-zoom_offset,
-                                     zoom_offset:-zoom_offset]
-                x_rec_zoom = torch.nn.functional.interpolate(
-                    x_rec_zoom,
-                    (x_rec_size, x_rec_size),
-                    mode="bilinear",
-                )
+        mask = torch.tensor(mask).to(self.device, torch.float32)[None, None, :]
+        mask[mask < 0.1] = 0
 
-                x_rec_zoom = 2. * x_rec_zoom - 1
-                zoom_z_logits, _, [_, _, indices
-                                   ] = self.vqgan_model.encode(x_rec_zoom)
+        for zoom_idx in range(num_generations):
+            optimizer = torch.optim.AdamW(
+                params=[optim_latents],
+                lr=lr,
+                betas=(0.9, 0.999),
+                weight_decay=0.1,
+            )
 
-                z_logits.data = zoom_z_logits.clone().detach()
+            optim_img = self.get_img_from_latents(optim_latents, )
 
-            for zoom_train_step in range(num_zoom_train_steps):
+            img_h = optim_img.shape[2]
+            img_w = optim_img.shape[3]
+
+            optim_img = torchvision.transforms.functional.affine(
+                optim_img,
+                angle=0,
+                translate=[0, 0],
+                scale=1 + zoom_offset / min(img_h, img_w),
+                shear=[0, 0],
+                resample=PIL.Image.BILINEAR,
+            )
+
+            init_img = optim_img.clone().detach()
+
+            zoom_latents = self.get_latents_from_img(
+                optim_img,
+                num_rec_steps=0,
+            )
+
+            optim_latents.data = zoom_latents
+
+            for train_idx in range(num_zoom_train_steps):
                 loss = 0
-                z = self.vqgan_model.post_quant_conv(z_logits)
-                rec_img = self.vqgan_model.decoder(z)
-                rec_img = (rec_img.clip(-1, 1) + 1) / 2
-                x_rec_stacked = self.augment(
-                    rec_img,
-                    rec_img.shape[1],
-                    rec_img.shape[2],
+
+                optim_img = self.get_img_from_latents(optim_latents, )
+                # optim_img = mask * optim_img + (1 - mask) * init_img
+
+                optim_img_batch = self.augment(
+                    optim_img,
+                    num_crops=64,
+                    # pad_downscale=8,
                 )
 
-                loss += 10 * self.compute_clip_loss(x_rec_stacked, prompt)
+                loss += 10 * self.compute_clip_loss(
+                    img_batch=optim_img_batch,
+                    text=prompt,
+                )
+
+                # logging.info(
+                #     f"Loss {loss} - {train_idx}/{num_zoom_train_steps}")
+
+                # loss += -10 * torch.cosine_similarity(init_latents,
+                #                                       optim_latents).mean()
 
                 logging.info(
-                    f"Loss {loss} - {zoom_train_step}/{num_zoom_train_steps}")
+                    f"Loss {loss} - {train_idx + 1}/{num_zoom_train_steps}")
+
+                def scale_grad(grad, ):
+                    grad_size = grad.shape[2:4]
+                    grad_mask = torch.nn.functional.interpolate(
+                        mask,
+                        grad_size,
+                        mode="bilinear",
+                    )
+
+                    masked_grad = grad * grad_mask
+
+                    return masked_grad
+
+                # optim_img_hook = optim_img.register_hook(scale_grad, )
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-            z_logits_1 = init_latents
-            z_logits_2 = z_logits
+                # optim_img_hook.remove()
 
-            for zoom_step in range(num_zoom_interp_steps):
-                weight = zoom_step / num_zoom_interp_steps
-                interp_logits = weight * z_logits_2 + (1 - weight) * z_logits_1
+            interp_img_list = self.interpolate(
+                [init_latents, optim_latents],
+                duration_list=[
+                    num_zoom_interp_steps / FPS,
+                    num_zoom_interp_steps / FPS,
+                ],
+                interpolation_type="linear",
+                loop=False,
+            )
 
-                with torch.no_grad():
-                    z = self.vqgan_model.post_quant_conv(interp_logits)
-                    rec_img = self.vqgan_model.decoder(z)
-                    rec_img = (rec_img.clip(-1, 1) + 1) / 2
-
-                x_rec_img = torchvision.transforms.ToPILImage(mode='RGB')(
-                    rec_img[0])
-                gen_img_list.append(x_rec_img)
-
+            for interp_idx, interp_img in enumerate(interp_img_list):
                 print("Adding img...")
                 os.makedirs("generations", exist_ok=True)
-                x_rec_img = torchvision.transforms.ToPILImage(mode='RGB')(
-                    rec_img[0])
-                x_rec_img.save(
-                    f"generations/{step}_{zoom_step}_{zoom_train_step}.jpg")
+                interp_img.save(
+                    f"generations/{train_idx}_{zoom_idx}_{interp_idx}.jpg")
 
-            init_latents = z_logits.detach().clone()
+                interp_img = torchvision.transforms.PILToTensor()(interp_img, )
+                interp_img = interp_img.float().to(self.device) / 255.
+
+                gen_img_list.append(interp_img)
+                z_logits_list.append(optim_latents.detach().clone(), )
+
+                # NOTE: do not run the last frame
+                if interp_idx == len(interp_img_list) - 2:
+                    break
+
+            init_latents = optim_latents.detach().clone()
 
             torch.cuda.empty_cache()
 
@@ -503,7 +601,7 @@ class TamingDecoder(ImageGenerator):
 if __name__ == '__main__':
     target_img_height = 256
     target_img_width = 256
-    prompt = "A glowing jellyfish"
+    prompt = "Space dragons artsation"
     lr = 0.5
     num_steps = 100
     num_augmentations = 32
@@ -512,8 +610,8 @@ if __name__ == '__main__':
     # init_img_path = "medusa.jpg"
     loss_clip_value = None
 
-    save_latents = False
-    zoom = False
+    save_latents = True
+    zoom = True
 
     taming_decoder = TamingDecoder()
 
