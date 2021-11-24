@@ -1,4 +1,5 @@
 import abc
+import random
 from typing import *
 
 import torch
@@ -154,6 +155,8 @@ class ImageGenerator(
         # )
         aug_img_batch = self.aug_transform(img_batch)
 
+        bw_prob = 0.2
+
         augmented_img_list = []
         for crop_idx in range(num_crops):
             crop_size = int(
@@ -179,6 +182,11 @@ class ImageGenerator(
                     crop_size),
                 (),
             )
+
+            if random.random() < bw_prob:
+                bw_aug_img_batch = torchvision.transforms.Grayscale(
+                    num_output_channels=1)(aug_img_batch, )
+                aug_img_batch = bw_aug_img_batch.repeat(1, 3, 1, 1)
 
             augmented_img = aug_img_batch[:, :, offsety:offsety + crop_size,
                                           offsetx:offsetx + crop_size, ]
