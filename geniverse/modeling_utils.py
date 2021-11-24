@@ -16,14 +16,16 @@ class ImageGenerator(
     """
     This class provides common functionalities among image generators.
     """
-    def __init__(self, ):
+    def __init__(
+        self,
+        device: str = "cuda:0",
+    ):
         """
         Initializes CLIP, augmentations and set a device.
         """
         super(ImageGenerator, self).__init__()
 
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print(f"USING {self.device}")
+        self.device = device
 
         jit = True if float(torch.__version__[:3]) < 1.8 else False
         self.clip_model, _clip_preprocess = clip.load(
