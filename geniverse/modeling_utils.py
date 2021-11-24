@@ -140,7 +140,7 @@ class ImageGenerator(
                 y_pad_size,
                 y_pad_size,
             ),
-            mode='constant',
+            mode='reflect',
             value=0,
         )
 
@@ -235,9 +235,10 @@ class ImageGenerator(
         """
         if do_preprocess:
             img_batch = self.clip_norm_trans(img_batch)
-            img_batch = torch.nn.functional.upsample_bilinear(
+            img_batch = torch.nn.functional.interpolate(
                 img_batch,
                 (self.clip_input_img_size, self.clip_input_img_size),
+                mode="bilinear",
             )
 
         img_logits = self.clip_model.encode_image(img_batch)
