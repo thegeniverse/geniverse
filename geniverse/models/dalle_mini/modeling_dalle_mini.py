@@ -32,9 +32,9 @@ class DalleMini(ImageGenerator):
     """
     def __init__(
         self,
-        device=None,
+        device: str = "cuda",
     ):
-        super().__init__()
+        super().__init__(device=device, )
 
         if device is not None:
             self.device = device

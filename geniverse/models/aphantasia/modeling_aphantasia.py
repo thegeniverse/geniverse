@@ -24,9 +24,9 @@ class Aphantasia(ImageGenerator):
     """
     def __init__(
         self,
-        device: str = None,
+        device: str = "cuda",
     ):
-        super().__init__()
+        super().__init__(device=device, )
 
         if device is not None:
             self.device = device

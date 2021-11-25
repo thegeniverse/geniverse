@@ -28,7 +28,8 @@ class ImageGenerator(
 
         self.device = device
 
-        jit = True if float(torch.__version__[:3]) < 1.8 else False
+        # jit = True if float(torch.__version__[:3]) < 1.8 else False
+        jit = False
         self.clip_model, _clip_preprocess = clip.load(
             "ViT-B/32",
             jit=jit,

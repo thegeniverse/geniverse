@@ -52,7 +52,7 @@ class TamingDecoder(ImageGenerator):
         Args:
             device (str, optional): defaults to 'cuda'.
         """
-        super().__init__()
+        super().__init__(device=device, )
 
         if device is not None:
             self.device = device
