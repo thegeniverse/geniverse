@@ -58,7 +58,7 @@ class ImageGenerator(
                 p=0.8,
             ),
             torchvision.transforms.RandomPerspective(
-                distortion_scale=0.1,
+                distortion_scale=0.05,
                 p=0.4,
             ),
             torchvision.transforms.RandomApply(
@@ -109,7 +109,8 @@ class ImageGenerator(
         target_img_height: int = None,
         num_crops: int = 64,
         noise_factor: float = 0.11,
-        pad_downscale: int = 3,
+        pad_downscale: int = 2,
+        bw_prob: float = 0.1,
     ):
         """
         Augments a batch of images using random crops, affine
@@ -154,8 +155,6 @@ class ImageGenerator(
         #     # align_corners=True,
         # )
         aug_img_batch = self.aug_transform(img_batch)
-
-        bw_prob = 0.2
 
         augmented_img_list = []
         for crop_idx in range(num_crops):

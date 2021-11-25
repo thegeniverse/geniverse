@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="geniverse",
-    version="0.0.8",
+    version="0.0.9",
     author="Javi and Vicc",
     author_email="vipermu97@gmail.com",
     description=
@@ -44,6 +44,7 @@ setuptools.setup(
         "transformers>=4.10.0",
         # "flax>=0.3.4",
         # "jax==0.2.20",
+
         # "jaxlib==0.1.69+cuda110 -f https://storage.googleapis.com/jax-releases/jax_releases.html",
     ],
 )
