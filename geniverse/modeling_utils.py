@@ -111,7 +111,7 @@ class ImageGenerator(
         num_crops: int = 64,
         noise_factor: float = 0.11,
         pad_downscale: int = 2,
-        bw_prob: float = 0.1,
+        bw_prob: float = 0.2,
     ):
         """
         Augments a batch of images using random crops, affine
@@ -183,13 +183,13 @@ class ImageGenerator(
                 (),
             )
 
-            if random.random() < bw_prob:
-                bw_aug_img_batch = torchvision.transforms.Grayscale(
-                    num_output_channels=1)(aug_img_batch, )
-                aug_img_batch = bw_aug_img_batch.repeat(1, 3, 1, 1)
-
             augmented_img = aug_img_batch[:, :, offsety:offsety + crop_size,
                                           offsetx:offsetx + crop_size, ]
+
+            if random.random() < bw_prob:
+                bw_augmented_img = torchvision.transforms.Grayscale(
+                    num_output_channels=1, )(augmented_img, )
+                augmented_img = bw_augmented_img.repeat(1, 3, 1, 1)
 
             augmented_img = torch.nn.functional.interpolate(
                 augmented_img,
