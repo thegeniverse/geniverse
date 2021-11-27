@@ -44,6 +44,7 @@ class TamingDecoder(ImageGenerator):
         self,
         device: str = 'cuda',
         model_name: str = "imagenet-16384",
+        **kwargs,
     ) -> None:
         """
         Downloads the VQGAN model and loads a pre-defined 
@@ -52,7 +53,10 @@ class TamingDecoder(ImageGenerator):
         Args:
             device (str, optional): defaults to 'cuda'.
         """
-        super().__init__(device=device, )
+        super().__init__(
+            device=device,
+            **kwargs,
+        )
 
         if device is not None:
             self.device = device
@@ -264,7 +268,6 @@ class TamingDecoder(ImageGenerator):
         num_augmentations: int = 32,
         init_img_path: str = None,
         loss_type: str = 'cosine_similarity',
-        loss_clip_value: float = None,
         generation_cb=None,
         init_embed: torch.Tensor = None,
         **kwargs,
@@ -288,8 +291,6 @@ class TamingDecoder(ImageGenerator):
             loss_type (str, optional): either 'cosine_similarity' 
                 or 'spherical_distance'. Defaults to 
                 'cosine_similarity'.
-            loss_clip_value (float, optional): thresholding value for
-                for the CLIP embeddings. Defaults to None.
             generation_cb (function, optional): if provided, the 
                 function is executed for every optimization step. The
                 inputs of this function will be:  loss, step, rec_img, z_logits and step
@@ -364,7 +365,6 @@ class TamingDecoder(ImageGenerator):
                 x_rec_stacked,
                 prompt,
                 loss_type,
-                loss_clip_value,
             )
 
             loss += clip_loss
@@ -599,21 +599,26 @@ class TamingDecoder(ImageGenerator):
 
 
 if __name__ == '__main__':
-    target_img_height = 256
+    target_img_height = 200
     target_img_width = 256
-    prompt = "Space dragons artsation"
+    prompt = "Space mushrooms artsation"
     lr = 0.5
     num_steps = 100
     num_augmentations = 32
     loss_type = 'cosine_similarity'
     init_img_path = None
     # init_img_path = "medusa.jpg"
-    loss_clip_value = None
 
-    save_latents = True
-    zoom = True
+    save_latents = False
+    zoom = False
 
-    taming_decoder = TamingDecoder()
+    clip_model_name_list = [
+        "ViT-B/32",
+        "ViT-B/16",
+        # "RN50x16",
+        # "RN50x4",
+    ]
+    taming_decoder = TamingDecoder(clip_model_name_list=clip_model_name_list, )
 
     init_latents_path = f"./{prompt}_logits.pt"
     if os.path.exists(init_latents_path) and save_latents:
@@ -637,7 +642,6 @@ if __name__ == '__main__':
             num_augmentations=num_augmentations,
             init_img_path=init_img_path,
             loss_type=loss_type,
-            loss_clip_value=loss_clip_value,
             generation_cb=save_img_cb,
         )
 

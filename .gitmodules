@@ -7,3 +7,6 @@
 [submodule "forks/dalle_mini"]
 	path = forks/dalle_mini
 	url = https://github.com/vipermu/dalle-mini
+[submodule "forks/clip"]
+	path = forks/clip
+	url = https://github.com/vipermu/CLIP

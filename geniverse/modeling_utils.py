@@ -1,13 +1,16 @@
 import abc
 import random
+import logging
 from typing import *
 
 import torch
 import torchvision
-import clip
+# import clip
+
 import PIL
 import numpy as np
 from PIL import Image
+from forks.clip.clip import clip
 
 
 class ImageGenerator(
@@ -20,6 +23,9 @@ class ImageGenerator(
     def __init__(
         self,
         device: str = "cuda:0",
+        clip_model_name_list: List[str] = [
+            "ViT-B/32",
+        ],
     ):
         """
         Initializes CLIP, augmentations and set a device.
@@ -28,52 +34,45 @@ class ImageGenerator(
 
         self.device = device
 
+        self.clip_model_dict = {}
+
         # jit = True if float(torch.__version__[:3]) < 1.8 else False
         jit = False
-        self.clip_model, _clip_preprocess = clip.load(
-            "ViT-B/32",
-            jit=jit,
-            device=self.device,
-        )
-        self.clip_model = self.clip_model.eval()
+        for clip_model_name in clip_model_name_list:
+            logging.debug(f"LOADING {clip_model_name}...")
+            print(f"LOADING {clip_model_name}...")
 
-        self.clip_input_img_size = 224
+            clip_model, clip_preprocess = clip.load(
+                clip_model_name,
+                jit=jit,
+                device=self.device,
+            )
 
-        self.clip_norm_trans = torchvision.transforms.Normalize(
-            (0.48145466, 0.4578275, 0.40821073),
-            (0.26862954, 0.26130258, 0.27577711),
-        )
+            clip_model = clip_model.eval()
 
-        self.aug_transform = torch.nn.Sequential(
-            torchvision.transforms.RandomHorizontalFlip(p=0.4, ),
-            torchvision.transforms.RandomApply(
-                torch.nn.ModuleList([
-                    torchvision.transforms.RandomAffine(
-                        degrees=15,
-                        translate=(0.15, 0.15),
-                        scale=(0.8, 1.2),
-                        # shear=25,
-                        #
-                    ),
-                ]),
-                p=0.8,
-            ),
-            torchvision.transforms.RandomPerspective(
-                distortion_scale=0.05,
-                p=0.4,
-            ),
-            torchvision.transforms.RandomApply(
-                torch.nn.ModuleList([
-                    torchvision.transforms.ColorJitter(
-                        brightness=0.02,
-                        contrast=0.02,
-                        saturation=0.02,
-                        hue=0.01,
-                    ),
-                ]),
-                p=0.4,
-            ),
-        ).to(self.device)
+            clip_preprocess = torchvision.transforms.Compose([
+                transform for transform in clip_preprocess.transforms
+                if "function" not in repr(transform)
+                and "ToTensor" not in repr(transform)
+            ])
+
+            self.clip_model_dict[clip_model_name] = {
+                "model": clip_model,
+                # "input_img_size": clip_model.visual.input_resolution,
+                "preprocess": clip_preprocess,
+            }
+
+            # self.clip_input_img_size = 224
+
+            # self.clip_norm_trans = torchvision.transforms.Normalize(
+            #     (0.48145466, 0.4578275, 0.40821073),
+            #     (0.26862954, 0.26130258, 0.27577711),
+            # )
+
+        self.active_clip_model_name = random.choice(
+            list(self.clip_model_dict.keys()))
+        logging.debug(f"{self.active_clip_model_name} ACTIVE!")
+        print(f"{self.active_clip_model_name} ACTIVE!")
 
         self.supported_loss_types = [
             "cosine_similarity",
@@ -112,6 +111,17 @@ class ImageGenerator(
         noise_factor: float = 0.11,
         pad_downscale: int = 2,
         bw_prob: float = 0.2,
+        affine_prob: float = 0.8,
+        perspective_prob: float = 0.2,
+        jitter_prob=0.2,
+        affine_rotation_degrees: float = 15.,
+        affine_translate: Tuple = (0.15, 0.15),
+        affine_scale: Tuple = (0.8, 1.2),
+        perspective_distorsion: float = 0.05,
+        jitter_brightness: float = 0.02,
+        jitter_contrast: float = 0.02,
+        jitter_saturation: float = 0.02,
+        jitter_hue: float = 0.01,
     ):
         """
         Augments a batch of images using random crops, affine
@@ -128,10 +138,45 @@ class ImageGenerator(
         Returns:
             torch.Tensor: augmented batch of images.
         """
+        self.active_clip_model_name = random.choice(
+            list(self.clip_model_dict.keys()))
+        print(f"{self.active_clip_model_name} ACTIVE! (AUG)")
+
         if target_img_height is None:
             target_img_height = img_batch.shape[2]
         if target_img_width is None:
             target_img_width = img_batch.shape[3]
+
+        aug_transform = torch.nn.Sequential(
+            torchvision.transforms.RandomHorizontalFlip(p=0.4, ),
+            torchvision.transforms.RandomApply(
+                torch.nn.ModuleList([
+                    torchvision.transforms.RandomAffine(
+                        degrees=affine_rotation_degrees,
+                        translate=affine_translate,
+                        scale=affine_scale,
+                        # shear=25,
+                        #
+                    ),
+                ]),
+                p=affine_prob,
+            ),
+            torchvision.transforms.RandomPerspective(
+                distortion_scale=perspective_distorsion,
+                p=perspective_prob,
+            ),
+            torchvision.transforms.RandomApply(
+                torch.nn.ModuleList([
+                    torchvision.transforms.ColorJitter(
+                        brightness=jitter_brightness,
+                        contrast=jitter_contrast,
+                        saturation=jitter_saturation,
+                        hue=jitter_hue,
+                    ),
+                ]),
+                p=jitter_prob,
+            ),
+        ).to(self.device)
 
         x_pad_size = target_img_width // pad_downscale
         y_pad_size = target_img_height // pad_downscale
@@ -148,6 +193,7 @@ class ImageGenerator(
         )
 
         min_img_size = min(target_img_width, target_img_height)
+        max_img_size = max(target_img_width, target_img_height)
 
         # img_batch = torch.nn.functional.interpolate(
         #     img_batch,
@@ -155,7 +201,7 @@ class ImageGenerator(
         #     mode='bilinear',
         #     # align_corners=True,
         # )
-        aug_img_batch = self.aug_transform(img_batch)
+        aug_img_batch = aug_transform(img_batch)
 
         augmented_img_list = []
         for crop_idx in range(num_crops):
@@ -193,7 +239,7 @@ class ImageGenerator(
 
             augmented_img = torch.nn.functional.interpolate(
                 augmented_img,
-                (self.clip_input_img_size, ) * 2,
+                (max_img_size, ) * 2,
                 mode='bilinear',
                 align_corners=True,
             )
@@ -222,6 +268,8 @@ class ImageGenerator(
         #             img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
         #             255)).save(f'aug_{idx}.jpg')
 
+        torch.cuda.empty_cache()
+
         return img_batch
 
     def get_clip_img_encodings(
@@ -229,7 +277,7 @@ class ImageGenerator(
         img_batch: torch.Tensor,
         do_normalize: bool = True,
         do_preprocess: bool = True,
-    ) -> torch.Tensor:
+    ) -> List[torch.Tensor]:
         """
         Returns the CLIP encoding of an input batch of images.
 
@@ -241,26 +289,35 @@ class ImageGenerator(
         Returns:
             torch.Tensor: batched encodings of the input images.
         """
-        if do_preprocess:
-            img_batch = self.clip_norm_trans(img_batch)
-            img_batch = torch.nn.functional.interpolate(
-                img_batch,
-                (self.clip_input_img_size, self.clip_input_img_size),
-                mode="bilinear",
-            )
+        img_logits_list = []
 
-        img_logits = self.clip_model.encode_image(img_batch)
+        for clip_model_name, clip_model_data in self.clip_model_dict.items():
+            if clip_model_name != self.active_clip_model_name:
+                print(f"IMG {self.active_clip_model_name}")
+                continue
 
-        if do_normalize:
-            img_logits = img_logits / img_logits.norm(dim=-1, keepdim=True)
+            if do_preprocess:
+                img_batch = clip_model_data["preprocess"](img_batch)
+                # img_batch = torch.nn.functional.interpolate(
+                #     img_batch,
+                #     (clip_model_data["input_img_size"], ) * 2,
+                #     mode="bilinear",
+                # )
 
-        return img_logits
+            img_logits = clip_model_data["model"].encode_image(img_batch)
+
+            if do_normalize:
+                img_logits = img_logits / img_logits.norm(dim=-1, keepdim=True)
+
+            img_logits_list.append(img_logits, )
+
+        return img_logits_list
 
     def get_clip_text_encodings(
         self,
         text: str,
         do_normalize: bool = True,
-    ):
+    ) -> List[torch.Tensor, ]:
         """
         Returns the CLIP encoding of an input text.
 
@@ -271,22 +328,31 @@ class ImageGenerator(
         Returns:
             torch.Tensor: encoding of the input text.
         """
+        text_logits_list = []
+
         tokenized_text = clip.tokenize([text])
         tokenized_text = tokenized_text.to(self.device).detach().clone()
 
-        text_logits = self.clip_model.encode_text(tokenized_text)
+        for clip_model_name, clip_model_data in self.clip_model_dict.items():
+            if clip_model_name != self.active_clip_model_name:
+                print(f"TXT {self.active_clip_model_name}")
+                continue
 
-        if do_normalize:
-            text_logits = text_logits / text_logits.norm(dim=-1, keepdim=True)
+            text_logits = clip_model_data["model"].encode_text(tokenized_text)
 
-        return text_logits
+            if do_normalize:
+                text_logits = text_logits / text_logits.norm(dim=-1,
+                                                             keepdim=True)
+
+            text_logits_list.append(text_logits)
+
+        return text_logits_list
 
     def compute_clip_loss(
         self,
         img_batch: torch.Tensor,
         text: str,
         loss_type: str = 'cosine_similarity',
-        loss_clip_value: float = None,
     ) -> torch.Tensor:
         """
         Computes a distance between the CLIP encodings of a batch
@@ -298,25 +364,29 @@ class ImageGenerator(
             loss_type (str, optional): Loss type selector. Currently
                 loss types: `cosine_similarity` | 
                 'spherical_distance'. Defaults to 'cosine_similarity'.
-            loss_clip_value (float, optional): value for thresholding
-                the CLIP embeddings. Defaults to None.
 
         Returns:
             torch.Tensor: distance value.
         """
-        img_logits = self.get_clip_img_encodings(img_batch)
-        text_logits = self.get_clip_text_encodings(text)
-
-        if loss_clip_value is not None:
-            img_logits = img_logits.clip(-loss_clip_value, loss_clip_value)
-            text_logits = text_logits.clip(-loss_clip_value, loss_clip_value)
+        img_logits_list = self.get_clip_img_encodings(img_batch)
+        text_logits_list = self.get_clip_text_encodings(text)
 
         loss = 0
         if loss_type == 'cosine_similarity':
-            loss += -torch.cosine_similarity(text_logits, img_logits).mean()
+            for img_logits, text_logits in zip(img_logits_list,
+                                               text_logits_list):
+                loss += -torch.cosine_similarity(
+                    text_logits,
+                    img_logits,
+                ).mean()
+
         if loss_type == "spherical_distance":
-            loss = (text_logits - img_logits).norm(
-                dim=-1).div(2).arcsin().pow(2).mul(2).mean()
+            for img_logits, text_logits in zip(img_logits_list,
+                                               text_logits_list):
+                loss = (text_logits - img_logits).norm(
+                    dim=-1).div(2).arcsin().pow(2).mul(2).mean()
+
+        # loss /= len(self.clip_model_dict)
 
         return loss
 
@@ -352,6 +422,25 @@ class ImageGenerator(
         raise NotImplementedError(
             '`generate_from_prompt` method must be defined by the user.')
 
+
+class TestImageGenerator(
+        ImageGenerator, ):
+    def __init__(self, ):
+        super().__init__()
+
+    def generate_from_prompt(self, ):
+        pass
+
+
+if __name__ == "__main__":
+    image_generator = TestImageGenerator()
+
+    img_batch = torch.randn(1, 3, 200, 400).cuda()
+    text = "sup my man"
+    loss = image_generator.compute_clip_loss(
+        img_batch,
+        text,
+    )
 
 # import matplotlib.pyplot as plt
 
