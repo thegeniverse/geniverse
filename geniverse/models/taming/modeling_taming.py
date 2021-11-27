@@ -11,6 +11,7 @@ import numpy as np
 import omegaconf
 import PIL
 from PIL import Image
+from torch.utils.checkpoint import checkpoint
 from omegaconf import OmegaConf
 from forks.taming_transformers.taming.models.vqgan import VQModel, GumbelVQ
 from geniverse.modeling_utils import ImageGenerator
@@ -525,11 +526,12 @@ class TamingDecoder(ImageGenerator):
                 optim_img = self.get_img_from_latents(optim_latents, )
                 # optim_img = mask * optim_img + (1 - mask) * init_img
 
-                optim_img_batch = self.augment(
-                    optim_img,
-                    num_crops=64,
-                    # pad_downscale=8,
-                )
+                optim_img_batch = checkpoint(
+                    self.augment(
+                        optim_img,
+                        num_crops=64,
+                        # pad_downscale=8,
+                    ))
 
                 loss += 10 * self.compute_clip_loss(
                     img_batch=optim_img_batch,
@@ -599,7 +601,7 @@ class TamingDecoder(ImageGenerator):
 
 
 if __name__ == '__main__':
-    target_img_height = 200
+    target_img_height = 256
     target_img_width = 256
     prompt = "Space mushrooms artsation"
     lr = 0.5

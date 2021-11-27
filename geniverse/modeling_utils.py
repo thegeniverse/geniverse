@@ -1,16 +1,122 @@
 import abc
 import random
 import logging
+import gc
+import math
 from typing import *
 
 import torch
 import torchvision
-# import clip
 
 import PIL
 import numpy as np
 from PIL import Image
 from forks.clip.clip import clip
+
+
+def sinc(x):
+    return torch.where(
+        x != 0,
+        torch.sin(math.pi * x) / (math.pi * x),
+        x.new_ones([]),
+    )
+
+
+def lanczos(
+    x,
+    a,
+):
+    cond = torch.logical_and(-a < x, x < a)
+    out = torch.where(cond, sinc(x) * sinc(x / a), x.new_zeros([]))
+    return out / out.sum()
+
+
+def ramp(
+    ratio,
+    width,
+):
+    n = math.ceil(width / ratio + 1)
+    out = torch.empty([n])
+    cur = 0
+    for i in range(out.shape[0]):
+        out[i] = cur
+        cur += ratio
+
+    return torch.cat([-out[1:].flip([0]), out])[1:-1]
+
+
+def resample(
+    img_batch,
+    target_size,
+    align_corners=True,
+):
+    batch_size, num_channels, img_h, img_w = img_batch.shape
+    target_img_h, target_img_w = target_size
+
+    img_batch = img_batch.view([batch_size * num_channels, 1, img_h, img_w])
+
+    if target_img_h < img_h:
+        kernel_h = lanczos(
+            ramp(target_img_h / img_h, 2),
+            2,
+        ).to(img_batch.device, img_batch.dtype)
+
+        pad_h = (kernel_h.shape[0] - 1) // 2
+        img_batch = torch.nn.functional.pad(
+            img_batch,
+            (0, 0, pad_h, pad_h),
+            'reflect',
+        )
+        img_batch = torch.nn.functional.conv2d(
+            img_batch,
+            kernel_h[None, None, :, None],
+        )
+
+    if target_img_w < img_w:
+        kernel_w = lanczos(ramp(target_img_w / img_w, 2), 2).to(
+            img_batch.device,
+            img_batch.dtype,
+        )
+
+        pad_w = (kernel_w.shape[0] - 1) // 2
+        img_batch = torch.nn.functional.pad(
+            img_batch,
+            (pad_w, pad_w, 0, 0),
+            'reflect',
+        )
+        img_batch = torch.nn.functional.conv2d(
+            img_batch,
+            kernel_w[None, None, None, :],
+        )
+
+    img_batch = img_batch.view([batch_size, num_channels, img_h, img_w])
+
+    return torch.nn.functional.interpolate(
+        img_batch,
+        target_size,
+        mode='bicubic',
+        align_corners=align_corners,
+    )
+
+
+class ClampWithGrad(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        self,
+        input_tensor,
+        min_value,
+        max_value,
+    ):
+        self.min_value = min_value
+        self.max_value = max_value
+        self.save_for_backward(input_tensor)
+        return input_tensor.clamp(min_value, max_value)
+
+    @staticmethod
+    def backward(self, grad_in):
+        input_tensor, = self.saved_tensors
+        return grad_in * (grad_in * (input_tensor - input_tensor.clamp(
+            self.min_value, self.max_value)) >= 0, ), None, None
 
 
 class ImageGenerator(
@@ -58,7 +164,7 @@ class ImageGenerator(
 
             self.clip_model_dict[clip_model_name] = {
                 "model": clip_model,
-                # "input_img_size": clip_model.visual.input_resolution,
+                "input_img_size": clip_model.visual.input_resolution,
                 "preprocess": clip_preprocess,
             }
 
@@ -74,10 +180,17 @@ class ImageGenerator(
         logging.debug(f"{self.active_clip_model_name} ACTIVE!")
         print(f"{self.active_clip_model_name} ACTIVE!")
 
+        self.max_clip_img_size = max([
+            clip_data["input_img_size"]
+            for clip_data in self.clip_model_dict.values()
+        ])
+
         self.supported_loss_types = [
             "cosine_similarity",
             "spherical_distance",
         ]
+
+        self.aug_transform = None
 
     def add_noise(
         self,
@@ -98,19 +211,13 @@ class ImageGenerator(
             self.device) * torch.randn_like(img_batch, requires_grad=False)
 
         img_batch = img_batch + noise
+        # img_batch = ClampWithGrad()(img_batch, 0, 1)
         img_batch = img_batch.clamp(0, 1)
 
         return img_batch
 
-    def augment(
+    def set_augs(
         self,
-        img_batch: torch.Tensor,
-        target_img_width: int = None,
-        target_img_height: int = None,
-        num_crops: int = 64,
-        noise_factor: float = 0.11,
-        pad_downscale: int = 2,
-        bw_prob: float = 0.2,
         affine_prob: float = 0.8,
         perspective_prob: float = 0.2,
         jitter_prob=0.2,
@@ -123,31 +230,7 @@ class ImageGenerator(
         jitter_saturation: float = 0.02,
         jitter_hue: float = 0.01,
     ):
-        """
-        Augments a batch of images using random crops, affine
-        transformations and additive noise
-
-        Args:
-            img_batch (torch.Tensor): batch of images to augment with shape BxHxWx3.
-            target_img_width (int, optional): width of the augmented images. Defaults to img size.
-            target_img_height (int, optional): height of the augmented images. Defaults to img size
-            num_crops (int, optional): number of augmentations to generate. Defaults to 32.
-            noise_factor (float, optional): controls the amount of noise that is added to each crop. Defaults to 0.11.
-            pad_downscale (int, optional): represents the fraction of the original image size used to compute the amount of padding to be used. The larger the less padding. Defaults to 3.
-
-        Returns:
-            torch.Tensor: augmented batch of images.
-        """
-        self.active_clip_model_name = random.choice(
-            list(self.clip_model_dict.keys()))
-        print(f"{self.active_clip_model_name} ACTIVE! (AUG)")
-
-        if target_img_height is None:
-            target_img_height = img_batch.shape[2]
-        if target_img_width is None:
-            target_img_width = img_batch.shape[3]
-
-        aug_transform = torch.nn.Sequential(
+        self.aug_transform = torch.nn.Sequential(
             torchvision.transforms.RandomHorizontalFlip(p=0.4, ),
             torchvision.transforms.RandomApply(
                 torch.nn.ModuleList([
@@ -178,68 +261,92 @@ class ImageGenerator(
             ),
         ).to(self.device)
 
-        x_pad_size = target_img_width // pad_downscale
-        y_pad_size = target_img_height // pad_downscale
-        img_batch = torch.nn.functional.pad(
-            img_batch,
-            (
-                x_pad_size,
-                x_pad_size,
-                y_pad_size,
-                y_pad_size,
-            ),
-            mode='reflect',
-            value=0,
-        )
+    def augment(
+        self,
+        img_batch: torch.Tensor,
+        target_img_width: int = None,
+        target_img_height: int = None,
+        num_crops: int = 64,
+        noise_factor: float = 0.11,
+        pad_downscale: int = 2,
+        bw_prob: float = 0.2,
+    ):
+        """
+        Augments a batch of images using random crops, affine
+        transformations and additive noise
+
+        Args:
+            img_batch (torch.Tensor): batch of images to augment with shape BxHxWx3.
+            target_img_width (int, optional): width of the augmented images. Defaults to img size.
+            target_img_height (int, optional): height of the augmented images. Defaults to img size
+            num_crops (int, optional): number of augmentations to generate. Defaults to 32.
+            noise_factor (float, optional): controls the amount of noise that is added to each crop. Defaults to 0.11.
+            pad_downscale (int, optional): represents the fraction of the original image size used to compute the amount of padding to be used. The larger the less padding. Defaults to 3.
+
+        Returns:
+            torch.Tensor: augmented batch of images.
+        """
+        self.active_clip_model_name = random.choice(
+            list(self.clip_model_dict.keys()))
+        print(f"{self.active_clip_model_name} ACTIVE! (AUG)")
+
+        if target_img_height is None:
+            target_img_height = img_batch.shape[2]
+        if target_img_width is None:
+            target_img_width = img_batch.shape[3]
+
+        # x_pad_size = target_img_width // pad_downscale
+        # y_pad_size = target_img_height // pad_downscale
+        # img_batch = torch.nn.functional.pad(
+        #     img_batch,
+        #     (
+        #         x_pad_size,
+        #         x_pad_size,
+        #         y_pad_size,
+        #         y_pad_size,
+        #     ),
+        #     mode='constant',
+        #     value=0,
+        # )
 
         min_img_size = min(target_img_width, target_img_height)
-        max_img_size = max(target_img_width, target_img_height)
 
-        # img_batch = torch.nn.functional.interpolate(
-        #     img_batch,
-        #     (int(min(min_img_size, self.clip_input_img_size*1.5)), ) * 2,
-        #     mode='bilinear',
-        #     # align_corners=True,
-        # )
-        aug_img_batch = aug_transform(img_batch)
+        if self.aug_transform is None:
+            self.set_augs()
 
         augmented_img_list = []
         for crop_idx in range(num_crops):
-            crop_size = int(
-                torch.normal(
-                    1,
-                    .2,
-                    (),
-                ).clip(.4, 1.2) * min_img_size)
-
-            # if crop < num_crops - 4:
-            #     if crop > num_crops - 8:
-            #         crop_size = int(min_img_size * 1.2)
-
-            offsetx = torch.randint(
-                0,
-                int(target_img_width + target_img_width * 2 / pad_downscale -
-                    crop_size),
-                (),
-            )
-            offsety = torch.randint(
-                0,
-                int(target_img_height + target_img_height * 2 / pad_downscale -
-                    crop_size),
-                (),
-            )
-
-            augmented_img = aug_img_batch[:, :, offsety:offsety + crop_size,
-                                          offsetx:offsetx + crop_size, ]
-
+            augmented_img = self.aug_transform(img_batch, )
             if random.random() < bw_prob:
                 bw_augmented_img = torchvision.transforms.Grayscale(
                     num_output_channels=1, )(augmented_img, )
                 augmented_img = bw_augmented_img.repeat(1, 3, 1, 1)
 
+            crop_size = int(
+                torch.normal(
+                    .8,
+                    .3,
+                    (),
+                ).clip(self.max_clip_img_size / min_img_size, 1) *
+                min_img_size)
+
+            offsetx = torch.randint(
+                0,
+                int(target_img_width - crop_size) + 1,
+                (),
+            )
+            offsety = torch.randint(
+                0,
+                int(target_img_height - crop_size) + 1,
+                (),
+            )
+
+            augmented_img = augmented_img[:, :, offsety:offsety + crop_size,
+                                          offsetx:offsetx + crop_size, ]
+
             augmented_img = torch.nn.functional.interpolate(
                 augmented_img,
-                (max_img_size, ) * 2,
+                (self.max_clip_img_size, ) * 2,
                 mode='bilinear',
                 align_corners=True,
             )
@@ -259,16 +366,14 @@ class ImageGenerator(
             noise_factor=noise_factor,
         )
 
-        # from PIL import Image
-        # import numpy as np
+        from PIL import Image
+        import numpy as np
 
-        # for idx in range(img_batch.shape[0]):
-        #     Image.fromarray(
-        #         np.uint8(
-        #             img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
-        #             255)).save(f'aug_{idx}.jpg')
-
-        torch.cuda.empty_cache()
+        for idx in range(img_batch.shape[0]):
+            Image.fromarray(
+                np.uint8(
+                    img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
+                    255)).save(f'aug_{idx}.jpg')
 
         return img_batch
 
@@ -386,7 +491,8 @@ class ImageGenerator(
                 loss = (text_logits - img_logits).norm(
                     dim=-1).div(2).arcsin().pow(2).mul(2).mean()
 
-        # loss /= len(self.clip_model_dict)
+        torch.cuda.empty_cache()
+        gc.collect()
 
         return loss
 
