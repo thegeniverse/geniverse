@@ -327,7 +327,7 @@ class ImageGenerator(
                     .8,
                     .3,
                     (),
-                ).clip(self.max_clip_img_size / min_img_size, 1) *
+                ).clip(min(self.max_clip_img_size / min_img_size, 0.95), 1) *
                 min_img_size)
 
             offsetx = torch.randint(
