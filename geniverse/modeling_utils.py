@@ -366,14 +366,14 @@ class ImageGenerator(
             noise_factor=noise_factor,
         )
 
-        from PIL import Image
-        import numpy as np
+        # from PIL import Image
+        # import numpy as np
 
-        for idx in range(img_batch.shape[0]):
-            Image.fromarray(
-                np.uint8(
-                    img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
-                    255)).save(f'aug_{idx}.jpg')
+        # for idx in range(img_batch.shape[0]):
+        #     Image.fromarray(
+        #         np.uint8(
+        #             img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
+        #             255)).save(f'aug_{idx}.jpg')
 
         return img_batch
 
