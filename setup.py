@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="geniverse",
-    version="0.0.11",
+    version="0.0.12",
     author="Javi and Vicc",
     author_email="vipermu97@gmail.com",
     description=
@@ -25,11 +25,12 @@ setuptools.setup(
     #     "": ".",
     #     "taming": "./geniverse/models/taming/modeling_taming",
     # },
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=["tests*"]),
+    include_package_data=True,
     # packages=["geniverse", "forks"],
     python_requires=">=3.6",
     install_requires=[
-        "tqdm==4.60.0",
+        "tqdm>=4.60.0",
         "clip_by_openai==0.1.1.5",
         "dall-e==0.1",
         "imageio-ffmpeg==0.4.3",
