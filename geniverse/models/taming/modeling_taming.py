@@ -15,7 +15,7 @@ from torch.utils.checkpoint import checkpoint
 from omegaconf import OmegaConf
 from forks.taming_transformers.taming.models.vqgan import VQModel, GumbelVQ
 from geniverse.modeling_utils import ImageGenerator
-from scipy.stats import norm
+# from scipy.stats import norm
 
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
@@ -266,11 +266,12 @@ class TamingDecoder(ImageGenerator):
         target_img_height: int = 256,
         target_img_width: int = 256,
         num_steps: int = 200,
-        num_augmentations: int = 32,
+        num_augmentations: int = 64,
         init_img_path: str = None,
         loss_type: str = 'cosine_similarity',
         generation_cb=None,
         init_embed: torch.Tensor = None,
+        num_accum_steps: int = 4,
         **kwargs,
     ) -> Tuple[List[PIL.Image.Image], List[torch.Tensor]]:
         """
@@ -380,9 +381,11 @@ class TamingDecoder(ImageGenerator):
             logging.info(f"\nIteration {step} of {num_steps}")
             logging.info(f"Loss {round(float(loss.data), 2)}")
 
-            optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
+            if (step + 1) % num_accum_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                print("STEP")
 
             x_rec_img = torchvision.transforms.ToPILImage(mode='RGB')(
                 rec_img[0])
@@ -464,150 +467,150 @@ class TamingDecoder(ImageGenerator):
 
         return gen_img_list
 
-    def zoom(
-        self,
-        prompt: str,
-        init_latents: torch.Tensor,
-        lr: float = 0.05,
-        num_generations: int = 64,
-        num_zoom_interp_steps=1,
-        num_zoom_train_steps=1,
-        zoom_offset=4,
-    ):
-        gen_img_list = []
-        z_logits_list = []
+    # def zoom(
+    #     self,
+    #     prompt: str,
+    #     init_latents: torch.Tensor,
+    #     lr: float = 0.05,
+    #     num_generations: int = 64,
+    #     num_zoom_interp_steps=1,
+    #     num_zoom_train_steps=1,
+    #     zoom_offset=4,
+    # ):
+    #     gen_img_list = []
+    #     z_logits_list = []
 
-        optim_latents = init_latents.clone()
-        optim_latents = torch.nn.Parameter(optim_latents)
+    #     optim_latents = init_latents.clone()
+    #     optim_latents = torch.nn.Parameter(optim_latents)
 
-        init_img = self.get_img_from_latents(init_latents, )
-        img_size = init_img.shape[2::]
-        a = norm.pdf(np.arange(-1, 1, 2 / img_size[0]), 0, 0.2)
-        b = a / a.max()
-        mask = b[:, None] @ b[None, :]
+    #     init_img = self.get_img_from_latents(init_latents, )
+    #     img_size = init_img.shape[2::]
+    #     a = norm.pdf(np.arange(-1, 1, 2 / img_size[0]), 0, 0.2)
+    #     b = a / a.max()
+    #     mask = b[:, None] @ b[None, :]
 
-        mask = torch.tensor(mask).to(self.device, torch.float32)[None, None, :]
-        mask[mask < 0.1] = 0
+    #     mask = torch.tensor(mask).to(self.device, torch.float32)[None, None, :]
+    #     mask[mask < 0.1] = 0
 
-        for zoom_idx in range(num_generations):
-            optimizer = torch.optim.AdamW(
-                params=[optim_latents],
-                lr=lr,
-                betas=(0.9, 0.999),
-                weight_decay=0.1,
-            )
+    #     for zoom_idx in range(num_generations):
+    #         optimizer = torch.optim.AdamW(
+    #             params=[optim_latents],
+    #             lr=lr,
+    #             betas=(0.9, 0.999),
+    #             weight_decay=0.1,
+    #         )
 
-            optim_img = self.get_img_from_latents(optim_latents, )
+    #         optim_img = self.get_img_from_latents(optim_latents, )
 
-            img_h = optim_img.shape[2]
-            img_w = optim_img.shape[3]
+    #         img_h = optim_img.shape[2]
+    #         img_w = optim_img.shape[3]
 
-            optim_img = torchvision.transforms.functional.affine(
-                optim_img,
-                angle=0,
-                translate=[0, 0],
-                scale=1 + zoom_offset / min(img_h, img_w),
-                shear=[0, 0],
-                resample=PIL.Image.BILINEAR,
-            )
+    #         optim_img = torchvision.transforms.functional.affine(
+    #             optim_img,
+    #             angle=0,
+    #             translate=[0, 0],
+    #             scale=1 + zoom_offset / min(img_h, img_w),
+    #             shear=[0, 0],
+    #             resample=PIL.Image.BILINEAR,
+    #         )
 
-            init_img = optim_img.clone().detach()
+    #         init_img = optim_img.clone().detach()
 
-            zoom_latents = self.get_latents_from_img(
-                optim_img,
-                num_rec_steps=0,
-            )
+    #         zoom_latents = self.get_latents_from_img(
+    #             optim_img,
+    #             num_rec_steps=0,
+    #         )
 
-            optim_latents.data = zoom_latents
+    #         optim_latents.data = zoom_latents
 
-            for train_idx in range(num_zoom_train_steps):
-                loss = 0
+    #         for train_idx in range(num_zoom_train_steps):
+    #             loss = 0
 
-                optim_img = self.get_img_from_latents(optim_latents, )
-                # optim_img = mask * optim_img + (1 - mask) * init_img
+    #             optim_img = self.get_img_from_latents(optim_latents, )
+    #             # optim_img = mask * optim_img + (1 - mask) * init_img
 
-                optim_img_batch = checkpoint(
-                    self.augment(
-                        optim_img,
-                        num_crops=64,
-                        # pad_downscale=8,
-                    ))
+    #             optim_img_batch = checkpoint(
+    #                 self.augment(
+    #                     optim_img,
+    #                     num_crops=64,
+    #                     # pad_downscale=8,
+    #                 ))
 
-                loss += 10 * self.compute_clip_loss(
-                    img_batch=optim_img_batch,
-                    text=prompt,
-                )
+    #             loss += 10 * self.compute_clip_loss(
+    #                 img_batch=optim_img_batch,
+    #                 text=prompt,
+    #             )
 
-                # logging.info(
-                #     f"Loss {loss} - {train_idx}/{num_zoom_train_steps}")
+    #             # logging.info(
+    #             #     f"Loss {loss} - {train_idx}/{num_zoom_train_steps}")
 
-                # loss += -10 * torch.cosine_similarity(init_latents,
-                #                                       optim_latents).mean()
+    #             # loss += -10 * torch.cosine_similarity(init_latents,
+    #             #                                       optim_latents).mean()
 
-                logging.info(
-                    f"Loss {loss} - {train_idx + 1}/{num_zoom_train_steps}")
+    #             logging.info(
+    #                 f"Loss {loss} - {train_idx + 1}/{num_zoom_train_steps}")
 
-                def scale_grad(grad, ):
-                    grad_size = grad.shape[2:4]
-                    grad_mask = torch.nn.functional.interpolate(
-                        mask,
-                        grad_size,
-                        mode="bilinear",
-                    )
+    #             def scale_grad(grad, ):
+    #                 grad_size = grad.shape[2:4]
+    #                 grad_mask = torch.nn.functional.interpolate(
+    #                     mask,
+    #                     grad_size,
+    #                     mode="bilinear",
+    #                 )
 
-                    masked_grad = grad * grad_mask
+    #                 masked_grad = grad * grad_mask
 
-                    return masked_grad
+    #                 return masked_grad
 
-                # optim_img_hook = optim_img.register_hook(scale_grad, )
+    #             # optim_img_hook = optim_img.register_hook(scale_grad, )
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+    #             optimizer.zero_grad()
+    #             loss.backward()
+    #             optimizer.step()
 
-                # optim_img_hook.remove()
+    #             # optim_img_hook.remove()
 
-            interp_img_list = self.interpolate(
-                [init_latents, optim_latents],
-                duration_list=[
-                    num_zoom_interp_steps / FPS,
-                    num_zoom_interp_steps / FPS,
-                ],
-                interpolation_type="linear",
-                loop=False,
-            )
+    #         interp_img_list = self.interpolate(
+    #             [init_latents, optim_latents],
+    #             duration_list=[
+    #                 num_zoom_interp_steps / FPS,
+    #                 num_zoom_interp_steps / FPS,
+    #             ],
+    #             interpolation_type="linear",
+    #             loop=False,
+    #         )
 
-            for interp_idx, interp_img in enumerate(interp_img_list):
-                print("Adding img...")
-                os.makedirs("generations", exist_ok=True)
-                interp_img.save(
-                    f"generations/{train_idx}_{zoom_idx}_{interp_idx}.jpg")
+    #         for interp_idx, interp_img in enumerate(interp_img_list):
+    #             print("Adding img...")
+    #             os.makedirs("generations", exist_ok=True)
+    #             interp_img.save(
+    #                 f"generations/{train_idx}_{zoom_idx}_{interp_idx}.jpg")
 
-                interp_img = torchvision.transforms.PILToTensor()(interp_img, )
-                interp_img = interp_img.float().to(self.device) / 255.
+    #             interp_img = torchvision.transforms.PILToTensor()(interp_img, )
+    #             interp_img = interp_img.float().to(self.device) / 255.
 
-                gen_img_list.append(interp_img)
-                z_logits_list.append(optim_latents.detach().clone(), )
+    #             gen_img_list.append(interp_img)
+    #             z_logits_list.append(optim_latents.detach().clone(), )
 
-                # NOTE: do not run the last frame
-                if interp_idx == len(interp_img_list) - 2:
-                    break
+    #             # NOTE: do not run the last frame
+    #             if interp_idx == len(interp_img_list) - 2:
+    #                 break
 
-            init_latents = optim_latents.detach().clone()
+    #         init_latents = optim_latents.detach().clone()
 
-            torch.cuda.empty_cache()
+    #         torch.cuda.empty_cache()
 
-        return gen_img_list, z_logits_list
+    #     return gen_img_list, z_logits_list
 
 
 if __name__ == '__main__':
-    target_img_height = 256
-    target_img_width = 256
-    prompt = "Space mushrooms artsation"
-    lr = 0.5
-    num_steps = 100
-    num_augmentations = 32
-    loss_type = 'cosine_similarity'
+    target_img_height = 512
+    target_img_width = 128
+    prompt = "Money falling from the sky, trending on unsplash"
+    lr = 0.9
+    num_steps = 200
+    num_augmentations = 16
+    loss_type = 'spherical_distance'
     init_img_path = None
     # init_img_path = "medusa.jpg"
 

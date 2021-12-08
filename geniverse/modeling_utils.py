@@ -168,17 +168,10 @@ class ImageGenerator(
                 "preprocess": clip_preprocess,
             }
 
-            # self.clip_input_img_size = 224
-
-            # self.clip_norm_trans = torchvision.transforms.Normalize(
-            #     (0.48145466, 0.4578275, 0.40821073),
-            #     (0.26862954, 0.26130258, 0.27577711),
-            # )
-
         self.active_clip_model_name = random.choice(
             list(self.clip_model_dict.keys()))
+
         logging.debug(f"{self.active_clip_model_name} ACTIVE!")
-        print(f"{self.active_clip_model_name} ACTIVE!")
 
         self.max_clip_img_size = max([
             clip_data["input_img_size"]
@@ -295,21 +288,29 @@ class ImageGenerator(
         if target_img_width is None:
             target_img_width = img_batch.shape[3]
 
-        # x_pad_size = target_img_width // pad_downscale
-        # y_pad_size = target_img_height // pad_downscale
-        # img_batch = torch.nn.functional.pad(
-        #     img_batch,
-        #     (
-        #         x_pad_size,
-        #         x_pad_size,
-        #         y_pad_size,
-        #         y_pad_size,
-        #     ),
-        #     mode='constant',
-        #     value=0,
-        # )
+        pad_percent = 0
+        x_pad_percent = 1 / min(1, target_img_width / target_img_height)
+        y_pad_percent = 1 / min(1, target_img_height / target_img_width)
+        x_pad_size = target_img_width * (x_pad_percent - 1)
+        y_pad_size = target_img_height * (y_pad_percent - 1)
+        # value = random.choice([0, 256]) / 256
+        value = 0
+        img_batch = torch.nn.functional.pad(
+            img_batch,
+            (
+                int(x_pad_size / 2),
+                int(x_pad_size / 2),
+                int(y_pad_size / 2),
+                int(y_pad_size / 2),
+            ),
+            mode='constant',
+            value=value,
+        )
 
+        max_img_size = max(target_img_width, target_img_height)
+        # max_img_size = max_img_size + min(y_pad_percent, x_pad_percent)
         min_img_size = min(target_img_width, target_img_height)
+        # min_img_size = min_img_size + min(y_pad_size, x_pad_size)
 
         if self.aug_transform is None:
             self.set_augs()
@@ -324,20 +325,20 @@ class ImageGenerator(
 
             crop_size = int(
                 torch.normal(
-                    .8,
-                    .3,
+                    .7,
+                    .4,
                     (),
-                ).clip(min(self.max_clip_img_size / min_img_size, 0.95), 1) *
-                min_img_size)
+                ).clip(min(self.max_clip_img_size / max_img_size, 0.95), 1) *
+                max_img_size)
 
             offsetx = torch.randint(
                 0,
-                int(target_img_width - crop_size) + 1,
+                int(target_img_width + x_pad_size - crop_size) + 1,
                 (),
             )
             offsety = torch.randint(
                 0,
-                int(target_img_height - crop_size) + 1,
+                int(target_img_height + y_pad_size - crop_size) + 1,
                 (),
             )
 
@@ -366,14 +367,14 @@ class ImageGenerator(
             noise_factor=noise_factor,
         )
 
-        # from PIL import Image
-        # import numpy as np
+        from PIL import Image
+        import numpy as np
 
-        # for idx in range(img_batch.shape[0]):
-        #     Image.fromarray(
-        #         np.uint8(
-        #             img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
-        #             255)).save(f'aug_{idx}.jpg')
+        for idx in range(img_batch.shape[0]):
+            Image.fromarray(
+                np.uint8(
+                    img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
+                    255)).save(f'aug_{idx}.jpg')
 
         return img_batch
 
