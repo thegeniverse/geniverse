@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="geniverse",
-    version="0.1.2",
+    version="0.1.3",
     author="Geniverse",
     author_email="vipermu97@gmail.com",
     description=
