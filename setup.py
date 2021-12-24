@@ -3,12 +3,9 @@ import setuptools
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-with open("envs/geniverse-requirements.txt", "r", encoding="utf-8") as fh:
-    requirements = fh.read().strip().split("\n")
-
 setuptools.setup(
     name="geniverse",
-    version="0.1.0",
+    version="0.1.2",
     author="Geniverse",
     author_email="vipermu97@gmail.com",
     description=
@@ -27,5 +24,5 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=["tests*"]),
     include_package_data=True,
     python_requires=">=3.6",
-    install_requires=requirements,
+    install_requires=["geniverse-hub>=0.0.5"],
 )
