@@ -28,6 +28,8 @@ class Glide(torch.nn.Module):
         """
         Glide model from OpenAI
         """
+        super().__init__()
+
         self.device = device
 
         glide_hub = hub_utils.load_from_hub("glide")
