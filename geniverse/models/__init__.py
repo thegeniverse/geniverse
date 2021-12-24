@@ -15,3 +15,8 @@ try:
 except Exception as e:
     logging.warning(repr(e))
     logging.warning("WARNING! DALLE MINI NOT AVAILABLE.")
+try:
+    from .glide.modeling_glide import Glide
+except Exception as e:
+    logging.warning(repr(e))
+    logging.warning("WARNING! GLIDE NOT AVAILABLE.")
