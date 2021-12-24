@@ -1,5 +1,5 @@
 # LOCAL CONFIG FILES
-.vscode/settings.json
+.vscode
 
 # CACHES
 .modeling_cache
@@ -15,5 +15,12 @@ experiments
 docs/build
 
 # IMAGES
-*.png
-*.jpg
+/*.png
+/*.jpg
+/*.mp4
+
+# SAVED LATENTS FOR TESTING
+/*.pt
+
+generations
+video_generations

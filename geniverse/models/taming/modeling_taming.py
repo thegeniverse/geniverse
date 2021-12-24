@@ -1,5 +1,5 @@
 import os
-import yaml
+import gc
 import math
 import logging
 import requests
@@ -8,12 +8,10 @@ from typing import *
 import torch
 import torchvision
 import numpy as np
-import omegaconf
 import PIL
 from PIL import Image
 from torch.utils.checkpoint import checkpoint
-from omegaconf import OmegaConf
-from forks.taming_transformers.taming.models.vqgan import VQModel, GumbelVQ
+from geniverse_hub import hub_utils
 from geniverse.modeling_utils import ImageGenerator
 # from scipy.stats import norm
 
@@ -62,98 +60,8 @@ class TamingDecoder(ImageGenerator):
         if device is not None:
             self.device = device
 
-        modeling_dir = os.path.dirname(os.path.abspath(__file__))
-        modeling_cache_dir = os.path.join(modeling_dir, ".modeling_cache")
-        os.makedirs(modeling_cache_dir, exist_ok=True)
-
-        modeling_ckpt_path = os.path.join(modeling_cache_dir,
-                                          f'{model_name}.ckpt')
-        if not os.path.exists(modeling_ckpt_path):
-            modeling_ckpt_url = VQGAN_CKPT_DICT[model_name]
-
-            logging.info(
-                f"Downloading pre-trained weights for VQ-GAN from {modeling_ckpt_url}"
-            )
-            results = requests.get(modeling_ckpt_url, allow_redirects=True)
-
-            with open(modeling_ckpt_path, "wb") as ckpt_file:
-                ckpt_file.write(results.content)
-
-        # TODO: update the url with our own config using the correct paths
-        modeling_config_path = os.path.join(modeling_cache_dir,
-                                            f'{model_name}.yaml')
-        if not os.path.exists(modeling_config_path):
-            modeling_config_url = VQGAN_CONFIG_DICT[model_name]
-
-            logging.info(
-                f"Downloading `{model_name}.yaml` from vipermu taming-transformers fork"
-            )
-            results = requests.get(modeling_config_url, allow_redirects=True)
-
-            with open(modeling_config_path, "wb") as yaml_file:
-                yaml_file.write(results.content)
-
-        vqgan_config_xl = self.load_config(
-            config_path=modeling_config_path,
-            display=False,
-        )
-        self.vqgan_model = self.load_vqgan(
-            vqgan_config_xl,
-            ckpt_path=modeling_ckpt_path,
-        ).to(self.device)
-
-    @staticmethod
-    def load_config(
-        config_path: str,
-        display=False,
-    ) -> omegaconf.dictconfig.DictConfig:
-        """
-        Loads a VQGAN configuration file from a path or URL.
-
-        Args:
-            config_path (str): local path or URL of the config file.
-            display (bool, optional): if `True` the configuration is 
-                printed. Defaults to False.
-
-        Returns:
-            omegaconf.dictconfig.DictConfig: configuration dictionary.
-        """
-        config = OmegaConf.load(config_path)
-
-        if display:
-            logging.info(yaml.dump(OmegaConf.to_container(config)))
-
-        return config
-
-    @staticmethod
-    def load_vqgan(
-        config: omegaconf.dictconfig.DictConfig,
-        ckpt_path: str = None,
-    ) -> VQModel:
-        """
-        Load a VQGAN model from a config file and a ckpt path 
-        where a VQGAN model is saved.
-
-        Args:
-            config ([type]): VQGAN model config.
-            ckpt_path ([type], optional): path of a saved model. 
-                Defaults to None.
-
-        Returns:
-            VQModel: 
-                loaded VQGAN model.
-        """
-        if "GumbelVQ" in config.model.target:
-            model = GumbelVQ(**config.model.params)
-        else:
-            model = VQModel(**config.model.params)
-
-        if ckpt_path is not None:
-            # XXX: check wtf is going on here
-            sd = torch.load(ckpt_path, map_location="cpu")["state_dict"]
-            missing, unexpected = model.load_state_dict(sd, strict=False)
-
-        return model.eval()
+        vqgan = hub_utils.load_from_hub("taming")
+        self.vqgan_model = vqgan.load_model(model_name).to(self.device)
 
     def get_img_from_latents(
         self,
@@ -602,17 +510,124 @@ class TamingDecoder(ImageGenerator):
 
     #     return gen_img_list, z_logits_list
 
+    def video(
+        self,
+        prompt: str,
+        video_path: str,
+        target_img_height=256,
+        target_img_width=256,
+        lr: float = 0.05,
+        num_generations: int = 4,
+        num_crops_per_accum: int = 4,
+        num_accum_steps: int = 8,
+        out_dir: str = "video_generations",
+    ):
+        import cv2
+
+        gen_img_list = []
+        z_logits_list = []
+
+        os.makedirs(out_dir, exist_ok=True)
+
+        vidcap = cv2.VideoCapture(video_path, )
+        success = True
+
+        frame_idx = 0
+        counter = 0
+        prev_latents = None
+        while success:
+            print(f"Processing frame {frame_idx}")
+            success, video_frame = vidcap.read()
+
+            counter += 1
+            if counter % 8 != 0:
+                continue
+
+            video_frame = cv2.cvtColor(video_frame, cv2.COLOR_BGR2RGB)
+            video_frame = Image.fromarray(video_frame, )
+            video_w, video_h = video_frame.size
+
+            max_target_res = max(target_img_height, target_img_width)
+            max_video_res = max(video_w, video_h)
+
+            video_frame = video_frame.resize((
+                int(video_w / max_video_res * max_target_res),
+                int(video_h / max_video_res * max_target_res),
+            ))
+
+            with torch.no_grad():
+                latents = self.get_latents_from_img(video_frame, )
+
+            latents = torch.nn.Parameter(latents.detach().clone())
+            latents.requires_grad = True
+
+            optimizer = torch.optim.AdamW(
+                params=[latents],
+                lr=lr,
+                betas=(0.9, 0.999),
+                weight_decay=0.1,
+            )
+
+            for train_idx in range(num_generations, ):
+                optim_img = self.get_img_from_latents(latents, )
+                loss = 0
+
+                for accum_step in range(num_accum_steps, ):
+                    optim_img_batch = self.augment(
+                        optim_img,
+                        num_crops=num_crops_per_accum,
+                    )
+
+                    loss += 10 * self.compute_clip_loss(
+                        img_batch=optim_img_batch,
+                        text=prompt,
+                        loss_type="spherical_distance",
+                    )
+
+                    if prev_latents is not None:
+                        loss += torch.cosine_similarity(latents,
+                                                        prev_latents).mean()
+
+                print(f"Loss {loss}")
+
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+
+                torch.cuda.empty_cache()
+                gc.collect()
+
+            with torch.no_grad():
+                updated_frame = self.get_img_from_latents(latents, )
+
+            gen_img_list.append(updated_frame)
+
+            updated_frame = torchvision.transforms.ToPILImage(mode="RGB")(
+                updated_frame[0])
+            updated_frame.save(os.path.join(out_dir, f"{frame_idx}.jpg"))
+
+            prev_latents = latents.detach().clone()
+
+            frame_idx += 1
+
+            torch.cuda.empty_cache()
+            gc.collect()
+
+        return gen_img_list, z_logits_list
+
 
 if __name__ == '__main__':
-    target_img_height = 512
+    target_img_height = 256
     target_img_width = 128
-    prompt = "Money falling from the sky, trending on unsplash"
-    lr = 0.9
+    prompt = "Sky full of red roses, Unsplash HD"
+    lr = 0.1
     num_steps = 200
     num_augmentations = 16
     loss_type = 'spherical_distance'
     init_img_path = None
     # init_img_path = "medusa.jpg"
+
+    video_path = "clouds.mp4"
 
     save_latents = False
     zoom = False
@@ -624,6 +639,18 @@ if __name__ == '__main__':
         # "RN50x4",
     ]
     taming_decoder = TamingDecoder(clip_model_name_list=clip_model_name_list, )
+
+    # gen_img_list, latents_list = taming_decoder.video(
+    #     prompt=prompt,
+    #     video_path=video_path,
+    #     target_img_height=target_img_height,
+    #     target_img_width=target_img_width,
+    #     lr=lr,
+    #     num_generations=8,
+    #     num_crops_per_accum=4,
+    #     num_accum_steps=4,
+    #     out_dir="video_generations",
+    # )
 
     init_latents_path = f"./{prompt}_logits.pt"
     if os.path.exists(init_latents_path) and save_latents:
