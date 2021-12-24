@@ -11,7 +11,7 @@ import torchvision
 import PIL
 import numpy as np
 from PIL import Image
-from forks.clip.clip import clip
+from geniverse_hub import hub_utils
 
 
 def sinc(x):
@@ -142,13 +142,15 @@ class ImageGenerator(
 
         self.clip_model_dict = {}
 
+        self.clip = hub_utils.load_from_hub("clip")
+
         # jit = True if float(torch.__version__[:3]) < 1.8 else False
         jit = False
         for clip_model_name in clip_model_name_list:
             logging.debug(f"LOADING {clip_model_name}...")
             print(f"LOADING {clip_model_name}...")
 
-            clip_model, clip_preprocess = clip.load(
+            clip_model, clip_preprocess = self.clip.load(
                 clip_model_name,
                 jit=jit,
                 device=self.device,
@@ -367,14 +369,14 @@ class ImageGenerator(
             noise_factor=noise_factor,
         )
 
-        from PIL import Image
-        import numpy as np
+        # from PIL import Image
+        # import numpy as np
 
-        for idx in range(img_batch.shape[0]):
-            Image.fromarray(
-                np.uint8(
-                    img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
-                    255)).save(f'aug_{idx}.jpg')
+        # for idx in range(img_batch.shape[0]):
+        #     Image.fromarray(
+        #         np.uint8(
+        #             img_batch[idx].permute(1, 2, 0).detach().cpu().numpy() *
+        #             255)).save(f'aug_{idx}.jpg')
 
         return img_batch
 
@@ -436,7 +438,7 @@ class ImageGenerator(
         """
         text_logits_list = []
 
-        tokenized_text = clip.tokenize([text])
+        tokenized_text = self.clip.tokenize([text])
         tokenized_text = tokenized_text.to(self.device).detach().clone()
 
         for clip_model_name, clip_model_data in self.clip_model_dict.items():
