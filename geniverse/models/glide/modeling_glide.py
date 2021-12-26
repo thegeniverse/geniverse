@@ -13,7 +13,8 @@ from geniverse_hub import hub_utils
 from geniverse.modeling_utils import ImageGenerator
 
 
-class Glide(torch.nn.Module):
+class Glide(
+        torch.nn.Module, ):
     """
     Image generator that leverages the decoder of VQGAN to 
     optimize images. This code uses the original implementation
@@ -28,7 +29,7 @@ class Glide(torch.nn.Module):
         """
         Glide model from OpenAI
         """
-        super().__init__(self, )
+        super(Glide, self).__init__()
 
         self.device = device
 
