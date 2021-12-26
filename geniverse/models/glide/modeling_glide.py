@@ -28,7 +28,7 @@ class Glide(torch.nn.Module):
         """
         Glide model from OpenAI
         """
-        super().__init__()
+        super().__init__(self, )
 
         self.device = device
 
