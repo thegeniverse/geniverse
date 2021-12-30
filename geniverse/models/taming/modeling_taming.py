@@ -17,19 +17,6 @@ from geniverse.modeling_utils import ImageGenerator
 
 logging.basicConfig(format='%(message)s', level=logging.INFO)
 
-VQGAN_CKPT_DICT = {
-    "imagenet-16384":
-    r"https://heibox.uni-heidelberg.de/d/a7530b09fed84f80a887/files/?p=%2Fckpts%2Flast.ckpt&dl=1",
-    "openimages-8192":
-    r"https://heibox.uni-heidelberg.de/d/2e5662443a6b4307b470/files/?p=%2Fckpts%2Flast.ckpt&dl=1",
-}
-VQGAN_CONFIG_DICT = {
-    "imagenet-16384":
-    r"https://raw.githubusercontent.com/vipermu/taming-transformers/master/configs/imagenet-16384.yaml",
-    "openimages-8192":
-    r"https://raw.githubusercontent.com/vipermu/taming-transformers/master/configs/openimages-8192.yaml",
-}
-
 FPS = 25
 
 
