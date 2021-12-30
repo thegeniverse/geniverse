@@ -423,7 +423,7 @@ class ImageGenerator(
 
     def get_clip_text_encodings(
         self,
-        text: str,
+        text: Union[str, List[str]],
         do_normalize: bool = True,
     ) -> List[torch.Tensor, ]:
         """
@@ -438,7 +438,10 @@ class ImageGenerator(
         """
         text_logits_list = []
 
-        tokenized_text = self.clip.tokenize([text])
+        if not isinstance(text, list):
+            text = [text]
+
+        tokenized_text = self.clip.tokenize(text)
         tokenized_text = tokenized_text.to(self.device).detach().clone()
 
         for clip_model_name, clip_model_data in self.clip_model_dict.items():
