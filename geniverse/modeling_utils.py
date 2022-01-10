@@ -173,7 +173,7 @@ class ImageGenerator(
         self.active_clip_model_name = random.choice(
             list(self.clip_model_dict.keys()))
 
-        logging.debug(f"{self.active_clip_model_name} ACTIVE!")
+        # logging.debug(f"{self.active_clip_model_name} ACTIVE!")
 
         self.max_clip_img_size = max([
             clip_data["input_img_size"]
@@ -283,7 +283,7 @@ class ImageGenerator(
         """
         self.active_clip_model_name = random.choice(
             list(self.clip_model_dict.keys()))
-        print(f"{self.active_clip_model_name} ACTIVE! (AUG)")
+        # print(f"{self.active_clip_model_name} ACTIVE! (AUG)")
 
         if target_img_height is None:
             target_img_height = img_batch.shape[2]
