@@ -446,7 +446,7 @@ class ImageGenerator(
 
         for clip_model_name, clip_model_data in self.clip_model_dict.items():
             if clip_model_name != self.active_clip_model_name:
-                print(f"TXT {self.active_clip_model_name}")
+                # print(f"TXT {self.active_clip_model_name}")
                 continue
 
             text_logits = clip_model_data["model"].encode_text(tokenized_text)
