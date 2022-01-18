@@ -7,6 +7,7 @@ from typing import *
 
 import torch
 import torchvision
+import kornia
 
 import PIL
 import numpy as np
@@ -147,8 +148,7 @@ class ImageGenerator(
         # jit = True if float(torch.__version__[:3]) < 1.8 else False
         jit = False
         for clip_model_name in clip_model_name_list:
-            logging.debug(f"LOADING {clip_model_name}...")
-            print(f"LOADING {clip_model_name}...")
+            logging.info(f"LOADING {clip_model_name}...")
 
             clip_model, clip_preprocess = self.clip.load(
                 clip_model_name,
@@ -211,50 +211,76 @@ class ImageGenerator(
 
         return img_batch
 
-    def set_augs(
+    def initialize_augmentations(
         self,
         affine_prob: float = 0.8,
         perspective_prob: float = 0.2,
-        jitter_prob=0.2,
-        affine_rotation_degrees: float = 15.,
+        jitter_prob=0.6,
+        grayscale_prob=0.2,
+        affine_rotation_degrees: float = 20.,
         affine_translate: Tuple = (0.15, 0.15),
         affine_scale: Tuple = (0.8, 1.2),
-        perspective_distorsion: float = 0.05,
+        perspective_distorsion: float = 0.15,  #0.05
         jitter_brightness: float = 0.02,
         jitter_contrast: float = 0.02,
         jitter_saturation: float = 0.02,
         jitter_hue: float = 0.01,
     ):
         self.aug_transform = torch.nn.Sequential(
-            torchvision.transforms.RandomHorizontalFlip(p=0.4, ),
-            torchvision.transforms.RandomApply(
-                torch.nn.ModuleList([
-                    torchvision.transforms.RandomAffine(
-                        degrees=affine_rotation_degrees,
-                        translate=affine_translate,
-                        scale=affine_scale,
-                        # shear=25,
-                        #
-                    ),
-                ]),
-                p=affine_prob,
+            kornia.augmentation.RandomHorizontalFlip(p=0.4),
+            kornia.augmentation.RandomSharpness(0.3, p=0.1),
+            torch.nn.Sequential(
+                kornia.augmentation.RandomAffine(
+                    degrees=affine_rotation_degrees,
+                    translate=affine_translate,
+                    scale=affine_scale,
+                    p=affine_prob,
+                    padding_mode='zeros',
+                ),
+                kornia.augmentation.RandomPerspective(
+                    perspective_distorsion,
+                    p=perspective_prob,
+                ),
             ),
-            torchvision.transforms.RandomPerspective(
-                distortion_scale=perspective_distorsion,
-                p=perspective_prob,
-            ),
-            torchvision.transforms.RandomApply(
-                torch.nn.ModuleList([
-                    torchvision.transforms.ColorJitter(
-                        brightness=jitter_brightness,
-                        contrast=jitter_contrast,
-                        saturation=jitter_saturation,
-                        hue=jitter_hue,
-                    ),
-                ]),
+            kornia.augmentation.ColorJitter(
+                brightness=jitter_brightness,
+                contrast=jitter_contrast,
+                saturation=jitter_saturation,
+                hue=jitter_hue,
                 p=jitter_prob,
             ),
+            kornia.augmentation.RandomGrayscale(p=grayscale_prob),
         ).to(self.device)
+        # self.aug_transform = torch.nn.Sequential(
+        #     torchvision.transforms.RandomHorizontalFlip(p=0.4, ),
+        #     torchvision.transforms.RandomApply(
+        #         torch.nn.ModuleList([
+        #             torchvision.transforms.RandomAffine(
+        #                 degrees=affine_rotation_degrees,
+        #                 translate=affine_translate,
+        #                 scale=affine_scale,
+        #                 # shear=25,
+        #                 #
+        #             ),
+        #         ]),
+        #         p=affine_prob,
+        #     ),
+        #     torchvision.transforms.RandomPerspective(
+        #         distortion_scale=perspective_distorsion,
+        #         p=perspective_prob,
+        #     ),
+        #     torchvision.transforms.RandomApply(
+        #         torch.nn.ModuleList([
+        #             torchvision.transforms.ColorJitter(
+        #                 brightness=jitter_brightness,
+        #                 contrast=jitter_contrast,
+        #                 saturation=jitter_saturation,
+        #                 hue=jitter_hue,
+        #             ),
+        #         ]),
+        #         p=jitter_prob,
+        #     ),
+        # ).to(self.device)
 
     def augment(
         self,
@@ -263,8 +289,6 @@ class ImageGenerator(
         target_img_height: int = None,
         num_crops: int = 64,
         noise_factor: float = 0.11,
-        pad_downscale: int = 2,
-        bw_prob: float = 0.2,
     ):
         """
         Augments a batch of images using random crops, affine
@@ -290,14 +314,13 @@ class ImageGenerator(
         if target_img_width is None:
             target_img_width = img_batch.shape[3]
 
-        pad_percent = 0
         x_pad_percent = 1 / min(1, target_img_width / target_img_height)
         y_pad_percent = 1 / min(1, target_img_height / target_img_width)
         x_pad_size = target_img_width * (x_pad_percent - 1)
         y_pad_size = target_img_height * (y_pad_percent - 1)
         # value = random.choice([0, 256]) / 256
         value = 0
-        img_batch = torch.nn.functional.pad(
+        pad_img_batch = torch.nn.functional.pad(
             img_batch,
             (
                 int(x_pad_size / 2),
@@ -310,59 +333,72 @@ class ImageGenerator(
         )
 
         max_img_size = max(target_img_width, target_img_height)
-        # max_img_size = max_img_size + min(y_pad_percent, x_pad_percent)
         min_img_size = min(target_img_width, target_img_height)
-        # min_img_size = min_img_size + min(y_pad_size, x_pad_size)
 
         if self.aug_transform is None:
-            self.set_augs()
+            self.initialize_augmentations()
 
-        augmented_img_list = []
+        crop_img_list = []
         for crop_idx in range(num_crops):
-            augmented_img = self.aug_transform(img_batch, )
-            if random.random() < bw_prob:
-                bw_augmented_img = torchvision.transforms.Grayscale(
-                    num_output_channels=1, )(augmented_img, )
-                augmented_img = bw_augmented_img.repeat(1, 3, 1, 1)
+            if 0.5 > random.random():
+                crop_size = int(
+                    torch.normal(
+                        .7,
+                        .4,
+                        (),
+                    ).clip(min(self.max_clip_img_size / max_img_size, 0.95), 1)
+                    * max_img_size)
 
-            crop_size = int(
-                torch.normal(
-                    .7,
-                    .4,
+                offsetx = torch.randint(
+                    0,
+                    int(target_img_width + x_pad_size - crop_size) + 1,
                     (),
-                ).clip(min(self.max_clip_img_size / max_img_size, 0.95), 1) *
-                max_img_size)
+                )
+                offsety = torch.randint(
+                    0,
+                    int(target_img_height + y_pad_size - crop_size) + 1,
+                    (),
+                )
 
-            offsetx = torch.randint(
-                0,
-                int(target_img_width + x_pad_size - crop_size) + 1,
-                (),
-            )
-            offsety = torch.randint(
-                0,
-                int(target_img_height + y_pad_size - crop_size) + 1,
-                (),
-            )
+                crop_img = pad_img_batch[:, :, offsety:offsety + crop_size,
+                                         offsetx:offsetx + crop_size, ]
+            else:
+                crop_size = int(
+                    torch.normal(
+                        .7,
+                        .4,
+                        (),
+                    ).clip(min(self.max_clip_img_size / min_img_size, 0.95), 1)
+                    * min_img_size)
 
-            augmented_img = augmented_img[:, :, offsety:offsety + crop_size,
-                                          offsetx:offsetx + crop_size, ]
+                offsetx = torch.randint(
+                    0,
+                    int(target_img_width - crop_size) + 1,
+                    (),
+                )
+                offsety = torch.randint(
+                    0,
+                    int(target_img_height - crop_size) + 1,
+                    (),
+                )
 
-            augmented_img = torch.nn.functional.interpolate(
-                augmented_img,
+                crop_img = img_batch[:, :, offsety:offsety + crop_size,
+                                     offsetx:offsetx + crop_size, ]
+
+            crop_img = torch.nn.functional.interpolate(
+                crop_img,
                 (self.max_clip_img_size, ) * 2,
                 mode='bilinear',
                 align_corners=True,
             )
 
-            augmented_img_list.append(augmented_img)
+            crop_img_list.append(crop_img)
 
-        img_batch = torch.cat(augmented_img_list, 0)
-
-        # img_list = []
-        # for _ in range(num_crops):
-        #     # img_batch = img_batch.repeat(num_crops, 1, 1, 1)
-        #     img_list.append(self.aug_transform(img_batch))
-        # img_batch = torch.cat(img_list)
+        img_batch = torch.cat(
+            crop_img_list,
+            dim=0,
+        )
+        img_batch = self.aug_transform(img_batch, )
 
         img_batch = self.add_noise(
             img_batch,
@@ -401,7 +437,7 @@ class ImageGenerator(
 
         for clip_model_name, clip_model_data in self.clip_model_dict.items():
             if clip_model_name != self.active_clip_model_name:
-                print(f"IMG {self.active_clip_model_name}")
+                # print(f"IMG {self.active_clip_model_name}")
                 continue
 
             if do_preprocess:

@@ -607,9 +607,9 @@ if __name__ == '__main__':
     target_img_height = 256
     target_img_width = 128
     prompt = "Sky full of red roses, Unsplash HD"
-    lr = 0.1
+    lr = 0.8
     num_steps = 200
-    num_augmentations = 16
+    num_augmentations = 32
     loss_type = 'spherical_distance'
     init_img_path = None
     # init_img_path = "medusa.jpg"
