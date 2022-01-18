@@ -340,50 +340,48 @@ class ImageGenerator(
 
         crop_img_list = []
         for crop_idx in range(num_crops):
-            if 0.5 > random.random():
-                crop_size = int(
-                    torch.normal(
-                        .7,
-                        .4,
-                        (),
-                    ).clip(min(self.max_clip_img_size / max_img_size, 0.95), 1)
-                    * max_img_size)
-
-                offsetx = torch.randint(
-                    0,
-                    int(target_img_width + x_pad_size - crop_size) + 1,
+            crop_size = int(
+                torch.normal(
+                    .7,
+                    .4,
                     (),
-                )
-                offsety = torch.randint(
-                    0,
-                    int(target_img_height + y_pad_size - crop_size) + 1,
-                    (),
-                )
+                ).clip(min(self.max_clip_img_size / max_img_size, 0.95), 1) *
+                max_img_size)
 
-                crop_img = pad_img_batch[:, :, offsety:offsety + crop_size,
-                                         offsetx:offsetx + crop_size, ]
-            else:
-                crop_size = int(
-                    torch.normal(
-                        .7,
-                        .4,
-                        (),
-                    ).clip(min(self.max_clip_img_size / min_img_size, 0.95), 1)
-                    * min_img_size)
+            offsetx = torch.randint(
+                0,
+                int(target_img_width + x_pad_size - crop_size) + 1,
+                (),
+            )
+            offsety = torch.randint(
+                0,
+                int(target_img_height + y_pad_size - crop_size) + 1,
+                (),
+            )
 
-                offsetx = torch.randint(
-                    0,
-                    int(target_img_width - crop_size) + 1,
-                    (),
-                )
-                offsety = torch.randint(
-                    0,
-                    int(target_img_height - crop_size) + 1,
-                    (),
-                )
-
-                crop_img = img_batch[:, :, offsety:offsety + crop_size,
+            crop_img = pad_img_batch[:, :, offsety:offsety + crop_size,
                                      offsetx:offsetx + crop_size, ]
+            # crop_size = int(
+            #     torch.normal(
+            #         .7,
+            #         .4,
+            #         (),
+            #     ).clip(min(self.max_clip_img_size / min_img_size, 0.95), 1)
+            #     * min_img_size)
+
+            # offsetx = torch.randint(
+            #     0,
+            #     int(target_img_width - crop_size) + 1,
+            #     (),
+            # )
+            # offsety = torch.randint(
+            #     0,
+            #     int(target_img_height - crop_size) + 1,
+            #     (),
+            # )
+
+            # crop_img = img_batch[:, :, offsety:offsety + crop_size,
+            #                         offsetx:offsetx + crop_size, ]
 
             crop_img = torch.nn.functional.interpolate(
                 crop_img,
