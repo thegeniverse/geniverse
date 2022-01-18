@@ -215,12 +215,12 @@ class ImageGenerator(
         self,
         affine_prob: float = 0.8,
         perspective_prob: float = 0.2,
-        jitter_prob=0.6,
+        jitter_prob=0.2,
         grayscale_prob=0.2,
-        affine_rotation_degrees: float = 20.,
+        affine_rotation_degrees: float = 15.,
         affine_translate: Tuple = (0.15, 0.15),
         affine_scale: Tuple = (0.8, 1.2),
-        perspective_distorsion: float = 0.15,  #0.05
+        perspective_distorsion: float = 0.05,
         jitter_brightness: float = 0.02,
         jitter_contrast: float = 0.02,
         jitter_saturation: float = 0.02,
@@ -228,7 +228,7 @@ class ImageGenerator(
     ):
         self.aug_transform = torch.nn.Sequential(
             kornia.augmentation.RandomHorizontalFlip(p=0.4),
-            kornia.augmentation.RandomSharpness(0.3, p=0.1),
+            kornia.augmentation.RandomSharpness(0.2, p=0.1),
             torch.nn.Sequential(
                 kornia.augmentation.RandomAffine(
                     degrees=affine_rotation_degrees,
