@@ -24,8 +24,9 @@ Generate art from text and images with 3 lines.
 
 <img src="./assets/a-snake-eating-itself.png" width="100%"/>
 
-_Text prompt: "A snake eating itself" --- by [Victor](https://twitter.com/viccpoes "Link to the
-tweet containing a snake eating itself")_
+_Text prompt: "A snake eating itself" --- by
+[Victor](https://twitter.com/viccpoes "Link to the tweet containing a snake
+eating itself")_
 
 ## Install
 ```bash
