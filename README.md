@@ -22,6 +22,10 @@ Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=
 Generate art from images and text using 3 lines of code.
 ```
 
+<img src="./assets/a-snake-eating-itself.png" width="100%"/>
+
+_A snake eating itself by [Victor](https://twitter.com/viccpoes "Link to the
+tweet containing a snake eating itself")_
 
 ## Install
 ```bash
@@ -40,13 +44,6 @@ image_list = taming_decoder.generate_from_prompt("a generative universe")
 
 For now you can generate images from text prompts, interpolate and create
 infinite zooms with your results. More examples soon :)
-
-## Examples
-
-<img src="./assets/a-snake-eating-itself.png" width="100%"/>
-
-_A snake eating itself by [Victor](https://twitter.com/viccpoes "Link to the
-tweet containing a snake eating itself")_
 
 ## Models
 
