@@ -10,7 +10,6 @@ Geniverse Invite Link: https://discord.gg/mzurTxGEa3
 
 [![Join Geniverse Discord
 Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=geniverse&logo=discord&logoColor=%23ff6db9&style=for-the-badge)](https://discord.gg/qjvkwPCg)
-
 <a href="https://pypi.org/project/geniverse/0.1.10/"> <img
 src="https://badge.fury.io/py/geniverse@2x.png" height="28"/> </a>
 
