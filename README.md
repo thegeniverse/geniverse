@@ -1,5 +1,17 @@
 # The Geniverse API
 
+<!-- Discord Badge
+
+Geniverse Channel ID: 896000995010687046
+
+Geniverse Invite Link: https://discord.gg/mzurTxGEa3
+
+-->
+
+[![Join Geniverse Discord
+Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=geniverse&logo=discord&logoColor=%23ff6db9&style=for-the-badge)](https://discord.gg/qjvkwPCg)
+
+
 ```
    ______           _                         
   / ____/__  ____  (_)   _____  _____________ 
@@ -9,16 +21,6 @@
                                               
 Generate art from images and text using 3 lines of code.
 ```
-
-<!-- Discord Badge
-
-Geniverse Channel ID: 896000995010687046
-Geniverse Invite Link: https://discord.gg/mzurTxGEa3
-
--->
-
-[![Join Geniverse Discord
-Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=geniverse&logo=discord&logoColor=%23ff6db9&style=for-the-badge)](https://discord.gg/qjvkwPCg)
 
 
 ## Install
