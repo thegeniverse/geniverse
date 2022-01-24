@@ -26,7 +26,7 @@ infinite zooms with your results. More examples soon :)
 ## Models
 
 So far we have adapted to our pipeline the following models:
-- VQGAN
-- Aphantasia
-- Mini-Dalle
+- [VQGAN](https://compvis.github.io/taming-transformers/ "Reference to the VQGAN microsite")
+- [Aphantasia](https://github.com/eps696/aphantasia "Reference to the Aphantasia GitHub repository")
+- [Mini-Dalle](https://github.com/borisdayma/dalle-mini "Reference to the Mini Dall-E GitHub repository")
 
