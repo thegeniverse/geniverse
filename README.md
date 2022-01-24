@@ -21,8 +21,6 @@ Geniverse Invite Link: https://discord.gg/mzurTxGEa3
 Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=geniverse&logo=discord&logoColor=%23ff6db9&style=for-the-badge)](https://discord.gg/qjvkwPCg)
 
 
-Generate art from images and text using 3 lines of code.
-
 ## Install
 ```bash
 pip install geniverse
