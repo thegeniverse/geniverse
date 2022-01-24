@@ -19,12 +19,12 @@ Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=
 / /_/ /  __/ / / / /| |/ /  __/ /  (__  )  __/
 \____/\___/_/ /_/_/ |___/\___/_/  /____/\___/ 
                                               
-Generate art from images and text using 3 lines of code.
+Generate art from text and images with 3 lines.
 ```
 
 <img src="./assets/a-snake-eating-itself.png" width="100%"/>
 
-_A snake eating itself by [Victor](https://twitter.com/viccpoes "Link to the
+_Text prompt: "A snake eating itself" --- by [Victor](https://twitter.com/viccpoes "Link to the
 tweet containing a snake eating itself")_
 
 ## Install
