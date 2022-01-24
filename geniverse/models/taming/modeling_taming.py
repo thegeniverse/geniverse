@@ -2,7 +2,6 @@ import os
 import gc
 import math
 import logging
-import requests
 from typing import *
 
 import torch
@@ -23,8 +22,9 @@ FPS = 25
 class TamingDecoder(ImageGenerator):
     """
     Image generator that leverages the decoder of VQGAN to 
-    optimize images. This code uses the original implementation
-    from https://github.com/CompVis/taming-transformers.
+    optimize images. This code uses a code based on the original
+    from https://github.com/CompVis/taming-transformers. Find it
+    at https://github.com/thegeniverse/taming.
     """
     def __init__(
         self,
@@ -33,7 +33,7 @@ class TamingDecoder(ImageGenerator):
         **kwargs,
     ) -> None:
         """
-        Downloads the VQGAN model and loads a pre-defined 
+        Loads the VQGAN model and a pre-defined 
         configuration.
 
         Args:
@@ -56,6 +56,17 @@ class TamingDecoder(ImageGenerator):
         target_img_height: int = None,
         target_img_width: int = None,
     ) -> torch.Tensor:
+        """
+        Pass the values of `z_logits` to the VQGAN decoder to generate an image.
+
+        Args:
+            z_logits (torch.Tensor): intermediate representation of VQGAN logits.
+            target_img_height (int, optional): height of the final image. Defaults to None.
+            target_img_width (int, optional): width of the final image. Defaults to None.
+
+        Returns:
+            torch.Tensor: generated image.
+        """
         z = self.vqgan_model.post_quant_conv(z_logits)
         img_rec = self.vqgan_model.decoder(z)
         img_rec = (img_rec.clip(-1, 1) + 1) / 2
@@ -74,7 +85,19 @@ class TamingDecoder(ImageGenerator):
         target_img_height,
         target_img_width,
         batch_size=1,
-    ):
+    ) -> torch.Tensor:
+        """
+        Generate a random VQGAN latent tensor that generates an image
+        of size `target_img_height` and `target_img_width`.
+
+        Args:
+            target_img_height ([type]): height of the image that the random latent will generate.
+            target_img_width ([type]): width of the image that the random latent will generate.
+            batch_size (int, optional): batch size of the generated image. Defaults to 1.
+
+        Returns:
+            torch.Tensor: resulting VQGAN random latents.
+        """
         embed_height = target_img_height // 16
         embed_width = target_img_width // 16
 
@@ -93,7 +116,18 @@ class TamingDecoder(ImageGenerator):
         self,
         img: Union[torch.Tensor, PIL.Image.Image],
         num_rec_steps: int = 0,
-    ):
+    ) -> torch.Tensor:
+        """
+        Pass the given image through the VQGAN encoder and obtain its representation.
+
+        Args:
+            img (Union[torch.Tensor, PIL.Image.Image]): input image.
+            num_rec_steps (int, optional): number of optimization steps for maximizing 
+                the resemblance between the generated image and the input. Defaults to 0.
+
+        Returns:
+            torch.Tensor: resulting VQGAN latents.
+        """
         if torch.is_tensor(img):
             img_tensor = img
             img_tensor = img_tensor * 2 - 1
@@ -193,6 +227,7 @@ class TamingDecoder(ImageGenerator):
                 inputs of this function will be:  loss, step, rec_img, z_logits and step
             init_embed (torh.Tensor, optional): initial embedding 
                 From where to start the generation. Defaults to None.
+            num_accum_steps (int, optional): number of gradient accumulation steps
 
         Returns:
             Tuple[List[PIL.Image.Image], List[torch.Tensor]]: list 
@@ -318,6 +353,7 @@ class TamingDecoder(ImageGenerator):
                 the interpolation between each consecutive tensor. 
                 The last value represent the duration between the 
                 last tensor and the initial.
+            interpolation_type (str): either "sinusoidal" or "linear".
 
         Returns:
             List[PIL.Image.Image]: list of the resulting generated images.
@@ -497,110 +533,110 @@ class TamingDecoder(ImageGenerator):
 
     #     return gen_img_list, z_logits_list
 
-    def video(
-        self,
-        prompt: str,
-        video_path: str,
-        target_img_height=256,
-        target_img_width=256,
-        lr: float = 0.05,
-        num_generations: int = 4,
-        num_crops_per_accum: int = 4,
-        num_accum_steps: int = 8,
-        out_dir: str = "video_generations",
-    ):
-        import cv2
+    # def video(
+    #     self,
+    #     prompt: str,
+    #     video_path: str,
+    #     target_img_height=256,
+    #     target_img_width=256,
+    #     lr: float = 0.05,
+    #     num_generations: int = 4,
+    #     num_crops_per_accum: int = 4,
+    #     num_accum_steps: int = 8,
+    #     out_dir: str = "video_generations",
+    # ):
+    #     import cv2
 
-        gen_img_list = []
-        z_logits_list = []
+    #     gen_img_list = []
+    #     z_logits_list = []
 
-        os.makedirs(out_dir, exist_ok=True)
+    #     os.makedirs(out_dir, exist_ok=True)
 
-        vidcap = cv2.VideoCapture(video_path, )
-        success = True
+    #     vidcap = cv2.VideoCapture(video_path, )
+    #     success = True
 
-        frame_idx = 0
-        counter = 0
-        prev_latents = None
-        while success:
-            print(f"Processing frame {frame_idx}")
-            success, video_frame = vidcap.read()
+    #     frame_idx = 0
+    #     counter = 0
+    #     prev_latents = None
+    #     while success:
+    #         print(f"Processing frame {frame_idx}")
+    #         success, video_frame = vidcap.read()
 
-            counter += 1
-            if counter % 8 != 0:
-                continue
+    #         counter += 1
+    #         if counter % 8 != 0:
+    #             continue
 
-            video_frame = cv2.cvtColor(video_frame, cv2.COLOR_BGR2RGB)
-            video_frame = Image.fromarray(video_frame, )
-            video_w, video_h = video_frame.size
+    #         video_frame = cv2.cvtColor(video_frame, cv2.COLOR_BGR2RGB)
+    #         video_frame = Image.fromarray(video_frame, )
+    #         video_w, video_h = video_frame.size
 
-            max_target_res = max(target_img_height, target_img_width)
-            max_video_res = max(video_w, video_h)
+    #         max_target_res = max(target_img_height, target_img_width)
+    #         max_video_res = max(video_w, video_h)
 
-            video_frame = video_frame.resize((
-                int(video_w / max_video_res * max_target_res),
-                int(video_h / max_video_res * max_target_res),
-            ))
+    #         video_frame = video_frame.resize((
+    #             int(video_w / max_video_res * max_target_res),
+    #             int(video_h / max_video_res * max_target_res),
+    #         ))
 
-            with torch.no_grad():
-                latents = self.get_latents_from_img(video_frame, )
+    #         with torch.no_grad():
+    #             latents = self.get_latents_from_img(video_frame, )
 
-            latents = torch.nn.Parameter(latents.detach().clone())
-            latents.requires_grad = True
+    #         latents = torch.nn.Parameter(latents.detach().clone())
+    #         latents.requires_grad = True
 
-            optimizer = torch.optim.AdamW(
-                params=[latents],
-                lr=lr,
-                betas=(0.9, 0.999),
-                weight_decay=0.1,
-            )
+    #         optimizer = torch.optim.AdamW(
+    #             params=[latents],
+    #             lr=lr,
+    #             betas=(0.9, 0.999),
+    #             weight_decay=0.1,
+    #         )
 
-            for train_idx in range(num_generations, ):
-                optim_img = self.get_img_from_latents(latents, )
-                loss = 0
+    #         for train_idx in range(num_generations, ):
+    #             optim_img = self.get_img_from_latents(latents, )
+    #             loss = 0
 
-                for accum_step in range(num_accum_steps, ):
-                    optim_img_batch = self.augment(
-                        optim_img,
-                        num_crops=num_crops_per_accum,
-                    )
+    #             for accum_step in range(num_accum_steps, ):
+    #                 optim_img_batch = self.augment(
+    #                     optim_img,
+    #                     num_crops=num_crops_per_accum,
+    #                 )
 
-                    loss += 10 * self.compute_clip_loss(
-                        img_batch=optim_img_batch,
-                        text=prompt,
-                        loss_type="spherical_distance",
-                    )
+    #                 loss += 10 * self.compute_clip_loss(
+    #                     img_batch=optim_img_batch,
+    #                     text=prompt,
+    #                     loss_type="spherical_distance",
+    #                 )
 
-                    if prev_latents is not None:
-                        loss += torch.cosine_similarity(latents,
-                                                        prev_latents).mean()
+    #                 if prev_latents is not None:
+    #                     loss += torch.cosine_similarity(latents,
+    #                                                     prev_latents).mean()
 
-                print(f"Loss {loss}")
+    #             print(f"Loss {loss}")
 
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+    #             loss.backward()
+    #             optimizer.step()
+    #             optimizer.zero_grad()
 
-                torch.cuda.empty_cache()
-                gc.collect()
+    #             torch.cuda.empty_cache()
+    #             gc.collect()
 
-            with torch.no_grad():
-                updated_frame = self.get_img_from_latents(latents, )
+    #         with torch.no_grad():
+    #             updated_frame = self.get_img_from_latents(latents, )
 
-            gen_img_list.append(updated_frame)
+    #         gen_img_list.append(updated_frame)
 
-            updated_frame = torchvision.transforms.ToPILImage(mode="RGB")(
-                updated_frame[0])
-            updated_frame.save(os.path.join(out_dir, f"{frame_idx}.jpg"))
+    #         updated_frame = torchvision.transforms.ToPILImage(mode="RGB")(
+    #             updated_frame[0])
+    #         updated_frame.save(os.path.join(out_dir, f"{frame_idx}.jpg"))
 
-            prev_latents = latents.detach().clone()
+    #         prev_latents = latents.detach().clone()
 
-            frame_idx += 1
+    #         frame_idx += 1
 
-            torch.cuda.empty_cache()
-            gc.collect()
+    #         torch.cuda.empty_cache()
+    #         gc.collect()
 
-        return gen_img_list, z_logits_list
+    #     return gen_img_list, z_logits_list
 
 
 if __name__ == '__main__':
