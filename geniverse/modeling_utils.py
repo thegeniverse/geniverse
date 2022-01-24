@@ -249,6 +249,7 @@ class ImageGenerator(
                 hue=jitter_hue,
                 p=jitter_prob,
             ),
+            # TODO: use blurrying
             kornia.augmentation.RandomGrayscale(p=grayscale_prob),
         ).to(self.device)
         # self.aug_transform = torch.nn.Sequential(
