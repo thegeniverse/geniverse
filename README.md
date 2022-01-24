@@ -1,8 +1,20 @@
 # The Geniverse API
 
+<!-- Discord Badge
+
+Geniverse Channel ID: 896000995010687046
+Geniverse Invite Link: https://discord.gg/mzurTxGEa3
+
+-->
+
+[![Join Geniverse Discord
+Server](https://img.shields.io/discord/823813159592001537?color=5865F2&logo=discord&logoColor=white)](https://discord.gg/qjvkwPCg)
+
 <img src="./assets/a-snake-eating-itself.png" width="128"/> _A snake eating
 itself by [Victor](https://twitter.com/viccpoes "Link to the tweet containing a
 snake eating itself")_
+
+Generate art from images and text using 3 lines of code.
 
 ## Install
 ```bash
