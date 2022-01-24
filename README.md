@@ -7,6 +7,7 @@
 / /_/ /  __/ / / / /| |/ /  __/ /  (__  )  __/
 \____/\___/_/ /_/_/ |___/\___/_/  /____/\___/ 
                                               
+Generate art from images and text using 3 lines of code.
 ```
 
 <!-- Discord Badge
@@ -19,10 +20,6 @@ Geniverse Invite Link: https://discord.gg/mzurTxGEa3
 [![Join Geniverse Discord
 Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=geniverse&logo=discord&logoColor=%23ff6db9&style=for-the-badge)](https://discord.gg/qjvkwPCg)
 
-<img src="./assets/a-snake-eating-itself.png" width="100%"/>
-
-_A snake eating itself by [Victor](https://twitter.com/viccpoes "Link to the
-tweet containing a snake eating itself")_
 
 Generate art from images and text using 3 lines of code.
 
@@ -30,7 +27,6 @@ Generate art from images and text using 3 lines of code.
 ```bash
 pip install geniverse
 ```
-
 ## Usage
 With this example we can generate `"a genierative universe"` using `VQGAN`. The
 result is a list of [PIL](https://pillow.readthedocs.io/) images. Docs will be
@@ -44,6 +40,13 @@ image_list = taming_decoder.generate_from_prompt("a generative universe")
 
 For now you can generate images from text prompts, interpolate and create
 infinite zooms with your results. More examples soon :)
+
+## Examples
+
+<img src="./assets/a-snake-eating-itself.png" width="100%"/>
+
+_A snake eating itself by [Victor](https://twitter.com/viccpoes "Link to the
+tweet containing a snake eating itself")_
 
 ## Models
 
