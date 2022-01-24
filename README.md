@@ -1,5 +1,8 @@
 # The Geniverse API
-Open source library to access and utilize generative AI models. 
+
+<img src="./assets/a-snake-eating-itself.png" width="128"/> _A snake eating
+itself by [Victor](https://twitter.com/viccpoes "Link to the tweet containing a
+snake eating itself")_
 
 ## Install
 ```bash
