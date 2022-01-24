@@ -10,9 +10,10 @@ Geniverse Invite Link: https://discord.gg/mzurTxGEa3
 [![Join Geniverse Discord
 Server](https://img.shields.io/discord/896000995010687046?color=%23ff6db9&label=geniverse&logo=discord&logoColor=%23ff6db9&style=for-the-badge)](https://discord.gg/qjvkwPCg)
 
-<img src="./assets/a-snake-eating-itself.png" width="128"/> _A snake eating
-itself by [Victor](https://twitter.com/viccpoes "Link to the tweet containing a
-snake eating itself")_
+<img src="./assets/a-snake-eating-itself.png" width="256"/>
+
+_A snake eating itself by [Victor](https://twitter.com/viccpoes "Link to the
+tweet containing a snake eating itself")_
 
 Generate art from images and text using 3 lines of code.
 
