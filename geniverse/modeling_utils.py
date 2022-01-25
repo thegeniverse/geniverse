@@ -2,7 +2,6 @@ import abc
 import random
 import logging
 import gc
-import math
 from typing import *
 
 import torch
@@ -15,117 +14,13 @@ from PIL import Image
 from geniverse_hub import hub_utils
 
 
-def sinc(x):
-    return torch.where(
-        x != 0,
-        torch.sin(math.pi * x) / (math.pi * x),
-        x.new_ones([]),
-    )
-
-
-def lanczos(
-    x,
-    a,
-):
-    cond = torch.logical_and(-a < x, x < a)
-    out = torch.where(cond, sinc(x) * sinc(x / a), x.new_zeros([]))
-    return out / out.sum()
-
-
-def ramp(
-    ratio,
-    width,
-):
-    n = math.ceil(width / ratio + 1)
-    out = torch.empty([n])
-    cur = 0
-    for i in range(out.shape[0]):
-        out[i] = cur
-        cur += ratio
-
-    return torch.cat([-out[1:].flip([0]), out])[1:-1]
-
-
-def resample(
-    img_batch,
-    target_size,
-    align_corners=True,
-):
-    batch_size, num_channels, img_h, img_w = img_batch.shape
-    target_img_h, target_img_w = target_size
-
-    img_batch = img_batch.view([batch_size * num_channels, 1, img_h, img_w])
-
-    if target_img_h < img_h:
-        kernel_h = lanczos(
-            ramp(target_img_h / img_h, 2),
-            2,
-        ).to(img_batch.device, img_batch.dtype)
-
-        pad_h = (kernel_h.shape[0] - 1) // 2
-        img_batch = torch.nn.functional.pad(
-            img_batch,
-            (0, 0, pad_h, pad_h),
-            'reflect',
-        )
-        img_batch = torch.nn.functional.conv2d(
-            img_batch,
-            kernel_h[None, None, :, None],
-        )
-
-    if target_img_w < img_w:
-        kernel_w = lanczos(ramp(target_img_w / img_w, 2), 2).to(
-            img_batch.device,
-            img_batch.dtype,
-        )
-
-        pad_w = (kernel_w.shape[0] - 1) // 2
-        img_batch = torch.nn.functional.pad(
-            img_batch,
-            (pad_w, pad_w, 0, 0),
-            'reflect',
-        )
-        img_batch = torch.nn.functional.conv2d(
-            img_batch,
-            kernel_w[None, None, None, :],
-        )
-
-    img_batch = img_batch.view([batch_size, num_channels, img_h, img_w])
-
-    return torch.nn.functional.interpolate(
-        img_batch,
-        target_size,
-        mode='bicubic',
-        align_corners=align_corners,
-    )
-
-
-class ClampWithGrad(torch.autograd.Function):
-    @staticmethod
-    def forward(
-        self,
-        input_tensor,
-        min_value,
-        max_value,
-    ):
-        self.min_value = min_value
-        self.max_value = max_value
-        self.save_for_backward(input_tensor)
-        return input_tensor.clamp(min_value, max_value)
-
-    @staticmethod
-    def backward(self, grad_in):
-        input_tensor, = self.saved_tensors
-        return grad_in * (grad_in * (input_tensor - input_tensor.clamp(
-            self.min_value, self.max_value)) >= 0, ), None, None
-
-
 class ImageGenerator(
         torch.nn.Module,
         metaclass=abc.ABCMeta,
 ):
     """
-    This class provides common functionalities among image generators.
+    This class provides common functionalities for any generative model that can be optimized
+    with CLIP.
     """
     def __init__(
         self,
@@ -135,7 +30,11 @@ class ImageGenerator(
         ],
     ):
         """
-        Initializes CLIP, augmentations and set a device.
+        Initializes CLIP models and set up class parameters.
+
+        Args:
+            device (str, optional): [description]. Defaults to "cuda:0".
+            clip_model_name_list (List[str], optional): [description]. Defaults to [ "ViT-B/32", ].
         """
         super(ImageGenerator, self).__init__()
 
