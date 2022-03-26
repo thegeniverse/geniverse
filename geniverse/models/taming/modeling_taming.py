@@ -29,7 +29,7 @@ class TamingDecoder(ImageGenerator):
     def __init__(
         self,
         device: str = 'cuda',
-        model_name: str = "imagenet-16384",
+        model_name: str = "imagenet_16384",
         **kwargs,
     ) -> None:
         """
